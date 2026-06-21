@@ -850,23 +850,12 @@
             </div>
         </div>
 
-        <!-- 開始〜終了入力 -->
-        <div id="manual-panel-range" class="hidden space-y-4">
-            <div class="flex items-end gap-3">
-                <div class="flex-1">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">開始</label>
-                    <input type="time" id="manualStartTime" onchange="updateManualRangePreview()"
-                           class="w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
-                           style="min-width:0;max-width:100%;">
-                </div>
-                <span class="font-extrabold text-slate-300 pb-3">〜</span>
-                <div class="flex-1">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">終了</label>
-                    <input type="time" id="manualEndTime" onchange="updateManualRangePreview()"
-                           class="w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
-                           style="min-width:0;max-width:100%;">
-                </div>
-            </div>
+        <!-- 開始〜終了入力（複数追加可能） -->
+        <div id="manual-panel-range" class="hidden space-y-3">
+            <div id="manual-range-rows" class="space-y-3"></div>
+            <button type="button" onclick="addManualRangeRow()" class="w-full py-2.5 text-xs font-bold rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 transition-all">
+                + 時間帯を追加
+            </button>
             <p id="manual-range-preview" class="text-[11px] font-bold text-slate-400 text-center min-h-[16px]"></p>
         </div>
 
@@ -897,7 +886,7 @@
     var fns = [
         'switchPage','doSignOut','createTask','toggleTask','resetTask','deleteTask',
         'addManualTask','openManualModal','closeManualModal','moveMonth','closeDetail','showToast',
-        'saveLifeLog','saveNickname','openNotices','closeNotices','addSubject','removeSubject','sendFeedback','setGraphRange','setStudyGraphRange','loadAdminFeedback','openDeleteAccount','closeDeleteAccount','doDeleteAccount','openReplyModal','closeReplyModal','sendReply','deleteFeedback','setDarkPref','openInsight','closeInsight','openLifeEditModal','closeLifeEditModal','saveLifeEditModal','setManualMode','updateManualRangePreview'
+        'saveLifeLog','saveNickname','openNotices','closeNotices','addSubject','removeSubject','sendFeedback','setGraphRange','setStudyGraphRange','loadAdminFeedback','openDeleteAccount','closeDeleteAccount','doDeleteAccount','openReplyModal','closeReplyModal','sendReply','deleteFeedback','setDarkPref','openInsight','closeInsight','openLifeEditModal','closeLifeEditModal','saveLifeEditModal','setManualMode','updateManualRangePreview','addManualRangeRow','removeManualRangeRow'
     ];
     fns.forEach(function(n) { window[n] = proxyFn(n); });
 
@@ -1588,36 +1577,93 @@ _registerImpl('deleteTask', async (id) => {
 
 let manualMode = 'duration';
 
+let manualRangeRowId = 0;
+
 function buildManualTimeSelects() {
-    // デフォルトは現在時刻を終了、1時間前を開始に
+    // デフォルトは現在時刻を終了、1時間前を開始に。最初の1行を作る
+    document.getElementById('manual-range-rows').innerHTML = '';
+    manualRangeRowId = 0;
+    addManualRangeRow();
+}
+
+function addManualRangeRow() {
     const now = new Date();
     const endH = now.getHours(), endM = now.getMinutes();
     let startH = endH - 1;
     if (startH < 0) startH += 24;
     const pad = n => String(n).padStart(2,'0');
-    document.getElementById('manualStartTime').value = `${pad(startH)}:${pad(endM)}`;
-    document.getElementById('manualEndTime').value   = `${pad(endH)}:${pad(endM)}`;
+    const startVal = `${pad(startH)}:${pad(endM)}`;
+    const endVal   = `${pad(endH)}:${pad(endM)}`;
+
+    const id = manualRangeRowId++;
+    const container = document.getElementById('manual-range-rows');
+    const row = document.createElement('div');
+    row.className = 'flex items-end gap-2 manual-range-row';
+    row.dataset.rowId = id;
+    row.innerHTML = `
+        <div class="flex-1">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">開始</label>
+            <input type="time" class="manual-start-time w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
+                   style="min-width:0;max-width:100%;" value="${startVal}" onchange="updateManualRangePreview()">
+        </div>
+        <span class="font-extrabold text-slate-300 pb-3">〜</span>
+        <div class="flex-1">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">終了</label>
+            <input type="time" class="manual-end-time w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
+                   style="min-width:0;max-width:100%;" value="${endVal}" onchange="updateManualRangePreview()">
+        </div>
+        <button type="button" onclick="removeManualRangeRow(${id})" class="remove-range-row-btn p-3 bg-slate-50 text-slate-300 hover:text-red-400 rounded-2xl transition-all shrink-0">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+    `;
+    container.appendChild(row);
+    updateRemoveButtonsVisibility();
     updateManualRangePreview();
+}
+_registerImpl('addManualRangeRow', addManualRangeRow);
+
+function removeManualRangeRow(id) {
+    const row = document.querySelector(`.manual-range-row[data-row-id="${id}"]`);
+    if (row) row.remove();
+    updateRemoveButtonsVisibility();
+    updateManualRangePreview();
+}
+_registerImpl('removeManualRangeRow', removeManualRangeRow);
+
+function updateRemoveButtonsVisibility() {
+    const rows = document.querySelectorAll('.manual-range-row');
+    rows.forEach(row => {
+        const btn = row.querySelector('.remove-range-row-btn');
+        if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+    });
+}
+
+function getManualRangeEntries() {
+    // 各行の {startVal, endVal, seconds} を返す。不正な行は null を含む
+    const rows = document.querySelectorAll('.manual-range-row');
+    const entries = [];
+    rows.forEach(row => {
+        const startVal = row.querySelector('.manual-start-time')?.value;
+        const endVal   = row.querySelector('.manual-end-time')?.value;
+        if (!startVal || !endVal) { entries.push(null); return; }
+        const [sh, sm] = startVal.split(':').map(Number);
+        const [eh, em] = endVal.split(':').map(Number);
+        const seconds = ((eh*60+em) - (sh*60+sm)) * 60;
+        entries.push({ startVal, endVal, seconds });
+    });
+    return entries;
 }
 
 function updateManualRangePreview() {
     const preview = document.getElementById('manual-range-preview');
     if (!preview) return;
-    const sec = getManualRangeSeconds();
-    if (sec === null) { preview.textContent = ''; return; }
-    if (sec <= 0) { preview.textContent = '終了時刻は開始時刻より後にしてください'; return; }
-    preview.textContent = `学習時間: ${fmtTime(sec)}`;
-}
-
-function getManualRangeSeconds() {
-    const startVal = document.getElementById('manualStartTime')?.value;
-    const endVal   = document.getElementById('manualEndTime')?.value;
-    if (!startVal || !endVal) return null;
-    const [sh, sm] = startVal.split(':').map(Number);
-    const [eh, em] = endVal.split(':').map(Number);
-    const startMin = sh*60 + sm;
-    const endMin   = eh*60 + em;
-    return (endMin - startMin) * 60; // 日をまたぐ（終了<開始）場合は負の値を返す
+    const entries = getManualRangeEntries();
+    if (!entries.length || entries.some(e => e === null)) { preview.textContent = ''; return; }
+    if (entries.some(e => e.seconds <= 0)) { preview.textContent = '終了時刻は開始時刻より後にしてください'; return; }
+    const total = entries.reduce((s,e) => s + e.seconds, 0);
+    preview.textContent = entries.length > 1
+        ? `合計学習時間: ${fmtTime(total)}（${entries.length}件）`
+        : `学習時間: ${fmtTime(total)}`;
 }
 
 _registerImpl('setManualMode', (mode) => {
@@ -1630,39 +1676,54 @@ _registerImpl('setManualMode', (mode) => {
 });
 
 _registerImpl('addManualTask', async () => {
-    let totalSeconds, startLabel, endLabel;
     const now = new Date();
+    const name = document.getElementById('taskNameInput').value.trim();
+    const tag  = document.getElementById('taskTagInput').value;
 
     if (manualMode === 'duration') {
         const h = parseInt(document.getElementById('manualHoursInput').value)   || 0;
         const m = parseInt(document.getElementById('manualMinutesInput').value) || 0;
         const s = parseInt(document.getElementById('manualSecondsInput').value) || 0;
-        totalSeconds = h*3600 + m*60 + s;
+        const totalSeconds = h*3600 + m*60 + s;
         if (totalSeconds <= 0) { showToast('時間を入力してください'); return; }
-        startLabel = '手入力'; endLabel = '完了';
+
+        setSyncState('syncing');
+        await addDoc(tasksCol(todayStr()), {
+            name, tag,
+            startTime: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+            elapsedSeconds: totalSeconds, isRunning:false, sessionStartTime:null, preSessionElapsed:0,
+            laps:[{start:'手入力', end:'完了', duration: totalSeconds}],
+            createdAt: Date.now()
+        });
+        setSyncState('ok');
     } else {
-        totalSeconds = getManualRangeSeconds();
-        if (totalSeconds === null) { showToast('開始・終了時刻を入力してください'); return; }
-        if (totalSeconds <= 0) { showToast('終了時刻は開始時刻より後にしてください'); return; }
-        startLabel = document.getElementById('manualStartTime').value;
-        endLabel   = document.getElementById('manualEndTime').value;
+        const entries = getManualRangeEntries();
+        if (!entries.length || entries.some(e => e === null)) { showToast('開始・終了時刻を入力してください'); return; }
+        if (entries.some(e => e.seconds <= 0)) { showToast('終了時刻は開始時刻より後にしてください'); return; }
+
+        setSyncState('syncing');
+        // 複数の時間帯をまとめて1件のタスクとして保存（lapsに複数記録）
+        const totalSeconds = entries.reduce((s,e) => s + e.seconds, 0);
+        const laps = entries
+            .slice()
+            .sort((a,b) => a.startVal.localeCompare(b.startVal))
+            .reverse()
+            .map(e => ({ start: e.startVal, end: e.endVal, duration: e.seconds }));
+        await addDoc(tasksCol(todayStr()), {
+            name, tag,
+            startTime: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+            elapsedSeconds: totalSeconds, isRunning:false, sessionStartTime:null, preSessionElapsed:0,
+            laps,
+            createdAt: Date.now()
+        });
+        setSyncState('ok');
     }
 
-    const name = document.getElementById('taskNameInput').value.trim();
-    setSyncState('syncing');
-    await addDoc(tasksCol(todayStr()), {
-        name, tag: document.getElementById('taskTagInput').value,
-        startTime: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
-        elapsedSeconds: totalSeconds, isRunning:false, sessionStartTime:null, preSessionElapsed:0,
-        laps:[{start:startLabel, end:endLabel, duration: totalSeconds}],
-        createdAt: Date.now()
-    });
     closeManualModal();
     document.getElementById('taskNameInput').value='';
     document.getElementById('manualHoursInput').value='';
     document.getElementById('manualMinutesInput').value='';
     document.getElementById('manualSecondsInput').value='';
-    setSyncState('ok');
 });
 
 _registerImpl('openManualModal', () => {
