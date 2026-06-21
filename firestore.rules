@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdminUser() {
+      return signedIn()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.isAdmin == true;
+    }
+
+    match /users/{userId}/{document=**} {
+
+      allow read, delete: if signedIn()
+                           && request.auth.uid == userId;
+
+      // 新規作成時、isAdmin を true にして自分で管理者になりすますことを防ぐ
+      allow create: if signedIn()
+                    && request.auth.uid == userId
+                    && (
+                      !('isAdmin' in request.resource.data)
+                      || request.resource.data.isAdmin == false
+                    );
+    }
+
+    match /users/{userId} {
+
+      // isAdmin フィールドは自分自身では変更できない
+      // （Firebase Console から手動で設定する運用にするため）
+      allow update: if signedIn()
+                    && request.auth.uid == userId
+                    && request.resource.data.isAdmin
+                       == resource.data.isAdmin;
+    }
+
+    match /users/{userId}/{subcollection}/{document=**} {
+
+      // days/tasks などサブコレクションは自由に書き込み可能
+      allow write: if signedIn()
+                   && request.auth.uid == userId;
+    }
+
+    match /feedback/{id} {
+
+      allow create: if signedIn();
+
+      allow read: if isAdminUser()
+                  || resource.data.uid == request.auth.uid;
+
+      allow update: if isAdminUser()
+                    || (
+                      resource.data.uid == request.auth.uid
+                      && request.resource.data
+                        .diff(resource.data)
+                        .affectedKeys()
+                        .hasOnly(['replyRead'])
+                    );
+
+      allow delete: if isAdminUser();
+    }
+  }
+}

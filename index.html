@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f8fafc">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="学習ログ">
+    <title>学習ログ - ログイン</title>
+    <!-- ファビコンを設定するコードを追加 -->
+    <link rel="icon" href="favicon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body {
+            margin: 0; min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            display: flex; align-items: center; justify-content: center;
+            padding: calc(1.5rem + var(--sat)) 1.5rem calc(1.5rem + var(--sab));
+            min-height: 100dvh;
+        }
+        .card {
+            width: 100%; max-width: 380px;
+            background: #ffffff;
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 28px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.08);
+        }
+        .field {
+            width: 100%;
+            padding: 14px 18px;
+            background: #f8fafc;
+            border: 1.5px solid rgba(15,23,42,0.08);
+            border-radius: 14px;
+            color: #0f172a;
+            font-size: 0.875rem;
+            font-weight: 600;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s;
+            font-family: inherit;
+        }
+        .field::placeholder { color: rgba(15,23,42,0.35); }
+        .field:focus { border-color: rgba(15,23,42,0.18); background: #ffffff; }
+        .btn-primary {
+            width: 100%; padding: 15px;
+            background: #0f172a; color: #ffffff;
+            font-weight: 800; font-size: 0.875rem;
+            border: none; border-radius: 14px;
+            cursor: pointer; transition: all 0.2s;
+            font-family: inherit; letter-spacing: 0.02em;
+        }
+        .btn-primary:hover { background: #111827; }
+        .btn-primary:active { transform: scale(0.97); }
+        .btn-secondary {
+            width: 100%; padding: 14px;
+            background: transparent;
+            color: rgba(15,23,42,0.75);
+            font-weight: 700; font-size: 0.8rem;
+            border: 1.5px solid rgba(15,23,42,0.15);
+            border-radius: 14px; cursor: pointer;
+            transition: all 0.2s; font-family: inherit;
+        }
+        .btn-secondary:hover { border-color: rgba(15,23,42,0.25); color: rgba(15,23,42,0.95); }
+        .btn-secondary:active { transform: scale(0.97); }
+        .err {
+            font-size: 11px; font-weight: 700;
+            color: #dc2626; text-align: center;
+            min-height: 18px;
+        }
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2.5px solid rgba(15,23,42,0.2);
+            border-top-color: #0f172a;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: inline-block; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .form-section { display: none; }
+        .form-section.active { display: flex; flex-direction: column; gap: 12px; }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: none;
+            padding: 4px 0;
+            transition: opacity 0.2s;
+        }
+
+        .link-btn:hover {
+            opacity: 0.7;
+        }
+        /* bg decoration */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: -1;
+            background:
+                radial-gradient(ellipse 60% 50% at 20% 20%, rgba(15,23,42,0.05) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 80% 80%, rgba(15,23,42,0.03) 0%, transparent 60%);
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div style="text-align:center; margin-bottom: 2rem;">
+        <div style="font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:#0f172a;">学習ログ</div>
+        <div id="subtitle" style="font-size:11px; font-weight:700; color:rgba(15,23,42,0.45); margin-top:6px; letter-spacing:0.06em; text-transform:uppercase;">Sign in to your account</div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="form-login" class="form-section active">
+        <input class="field" type="email" id="l-email" placeholder="メールアドレス" autocomplete="email">
+        <input class="field" type="password" id="l-pass" placeholder="パスワード" autocomplete="current-password">
+        <div class="err" id="l-err"></div>
+        <button class="btn-primary" id="l-btn" onclick="doLogin()">サインイン</button>
+        <button class="btn-secondary" onclick="show('register')">アカウントを作成</button>
+        <div style="text-align:center;">
+            <button class="link-btn" onclick="doReset()">パスワードを忘れた？</button>
+        </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="form-register" class="form-section">
+        <input class="field" type="email" id="r-email" placeholder="メールアドレス" autocomplete="email">
+        <input class="field" type="password" id="r-pass" placeholder="パスワード（6文字以上）" autocomplete="new-password">
+        <input class="field" type="password" id="r-pass2" placeholder="パスワード（再入力）" autocomplete="new-password">
+        <div class="err" id="r-err"></div>
+        <button class="btn-primary" id="r-btn" onclick="doRegister()">アカウント作成</button>
+        <button class="btn-secondary" onclick="show('login')">サインインに戻る</button>
+    </div>
+
+    <!-- EMAIL VERIFY -->
+    <div id="form-verify" class="form-section">
+        <div style="text-align:center; padding: 8px 0;">
+            <div style="display:flex; justify-content:center; margin-bottom:12px;">
+                <svg width="40" height="40" fill="none" stroke="#0f172a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" stroke-opacity="0"/><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+            </div>
+            <div style="font-size:0.875rem; font-weight:800; color:#0f172a; margin-bottom:8px;">メールを確認してください</div>
+            <div id="verify-email-display" style="font-size:11px; font-weight:700; color:rgba(15,23,42,0.45); margin-bottom:20px; word-break:break-all;"></div>
+            <div style="font-size:11px; font-weight:600; color:rgba(15,23,42,0.5); line-height:1.6; margin-bottom:12px;">
+                認証メールを送信しました。<br>メール内のリンクをクリックしてから<br>下のボタンを押してください。
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#d97706; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; margin-bottom:8px; line-height:1.6;">
+                メールが届かない場合は<br>迷惑メールフォルダもご確認ください
+            </div>
+        </div>
+        <div class="err" id="v-err"></div>
+        <button class="btn-primary" id="v-btn" onclick="checkVerified()">認証済みを確認</button>
+        <button class="btn-secondary" id="resend-btn" onclick="resendVerification()">認証メールを再送する</button>
+        <div style="text-align:center; margin-top:4px;">
+            <button class="link-btn" onclick="doSignOutFromVerify()">別のアカウントでログイン</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+         sendPasswordResetEmail, sendEmailVerification, onAuthStateChanged, signOut, reload }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey:            "AIzaSyAjvzxaHb7bwgW0vr_Nt0r1-HxFHtSyiZk",
+    authDomain:        "myda-fcef9.firebaseapp.com",
+    projectId:         "myda-fcef9",
+    storageBucket:     "myda-fcef9.firebasestorage.app",
+    messagingSenderId: "869826704788",
+    appId:             "1:869826704788:web:c2b03a56d79b49cd7e8b81",
+    measurementId:     "G-LHC57PYMWR"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// ログイン状態を監視
+onAuthStateChanged(auth, user => {
+    if (!user) return; // 未ログインは何もしない
+    if (user.emailVerified) {
+        // メール認証済み → アプリへ
+        location.href = '/dash/index.html';
+    } else {
+        // 未認証 → メール確認画面へ
+        showVerifyScreen(user.email);
+    }
+});
+
+function showVerifyScreen(email) {
+    document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+    document.getElementById('form-verify').classList.add('active');
+    document.getElementById('subtitle').textContent = 'Verify your email';
+    const el = document.getElementById('verify-email-display');
+    if (el) el.textContent = email || '';
+}
+
+function errMsg(code) {
+    const m = {
+        'auth/invalid-email':         'メールアドレスの形式が正しくありません',
+        'auth/user-not-found':        'アカウントが見つかりません',
+        'auth/wrong-password':        'パスワードが正しくありません',
+        'auth/invalid-credential':    'メールアドレスまたはパスワードが正しくありません',
+        'auth/email-already-in-use':  'このメールアドレスはすでに使用されています',
+        'auth/weak-password':         'パスワードは6文字以上にしてください',
+        'auth/too-many-requests':     'しばらく時間をおいてから再試行してください',
+        'auth/network-request-failed':'ネットワークエラー。接続を確認してください',
+    };
+    return m[code] || 'エラーが発生しました';
+}
+
+function setLoading(btnId, loading, label) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '<span class="spinner"></span>' : label;
+}
+
+window.show = (page) => {
+    document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+    document.getElementById('form-' + page).classList.add('active');
+    document.getElementById('subtitle').textContent =
+        page === 'login' ? 'Sign in to your account' : 'Create your account';
+    ['l-err','r-err','v-err'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.style.color = '#dc2626'; }
+    });
+};
+
+window.doLogin = async () => {
+    const email = document.getElementById('l-email').value.trim();
+    const pass  = document.getElementById('l-pass').value;
+    const errEl = document.getElementById('l-err');
+    errEl.textContent = ''; errEl.style.color = '#dc2626';
+    setLoading('l-btn', true, 'サインイン');
+    try {
+        const cred = await signInWithEmailAndPassword(auth, email, pass);
+        if (!cred.user.emailVerified) {
+            // 未認証ならメール確認画面へ（onAuthStateChangedが拾う）
+            showVerifyScreen(email);
+            setLoading('l-btn', false, 'サインイン');
+        }
+        // 認証済みならonAuthStateChangedがリダイレクト
+    } catch(e) {
+        errEl.textContent = errMsg(e.code);
+        setLoading('l-btn', false, 'サインイン');
+    }
+};
+
+window.doRegister = async () => {
+    const email = document.getElementById('r-email').value.trim();
+    const pw1   = document.getElementById('r-pass').value;
+    const pw2   = document.getElementById('r-pass2').value;
+    const errEl = document.getElementById('r-err');
+    errEl.textContent = '';
+    if (pw1 !== pw2) { errEl.textContent = 'パスワードが一致しません'; return; }
+    if (pw1.length < 6) { errEl.textContent = 'パスワードは6文字以上にしてください'; return; }
+    setLoading('r-btn', true, 'アカウント作成');
+    try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pw1);
+        // 認証メールを送信
+        await sendEmailVerification(cred.user);
+        showVerifyScreen(email);
+    } catch(e) {
+        errEl.textContent = errMsg(e.code);
+        setLoading('r-btn', false, 'アカウント作成');
+    }
+};
+
+// 認証済みか確認ボタン
+window.checkVerified = async () => {
+    const errEl = document.getElementById('v-err');
+    errEl.textContent = ''; errEl.style.color = '#dc2626';
+    setLoading('v-btn', true, '認証済みを確認');
+    try {
+        await reload(auth.currentUser);
+        if (auth.currentUser.emailVerified) {
+            location.href = '/dash/index.html';
+        } else {
+            errEl.textContent = 'まだ認証が完了していません。メールのリンクをクリックしてください。';
+            setLoading('v-btn', false, '認証済みを確認');
+        }
+    } catch(e) {
+        errEl.textContent = 'エラーが発生しました。再度お試しください。';
+        setLoading('v-btn', false, '認証済みを確認');
+    }
+};
+
+// 認証メール再送
+window.resendVerification = async () => {
+    const errEl = document.getElementById('v-err');
+    const btn   = document.getElementById('resend-btn');
+    try {
+        await sendEmailVerification(auth.currentUser);
+        errEl.style.color = '#16a34a';
+        errEl.textContent = '認証メールを再送しました。迷惑メールフォルダもご確認ください。';
+        btn.disabled = true;
+        setTimeout(() => { btn.disabled = false; }, 60000); // 1分クールダウン
+    } catch(e) {
+        errEl.style.color = '#dc2626';
+        errEl.textContent = e.code === 'auth/too-many-requests'
+            ? 'しばらく時間をおいてから再試行してください'
+            : 'エラーが発生しました';
+    }
+};
+
+// 別アカウントでログイン
+window.doSignOutFromVerify = async () => {
+    await signOut(auth);
+    show('login');
+};
+
+window.doReset = async () => {
+    const email = document.getElementById('l-email').value.trim();
+    const errEl = document.getElementById('l-err');
+    if (!email) { errEl.textContent = 'メールアドレスを入力してください'; return; }
+    try {
+        await sendPasswordResetEmail(auth, email);
+        errEl.style.color = '#16a34a';
+        errEl.textContent = 'リセットメールを送信しました。迷惑メールフォルダもご確認ください';
+    } catch(e) {
+        errEl.style.color = '#dc2626';
+        errEl.textContent = errMsg(e.code);
+    }
+};
+
+// Enterキー対応
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const active = document.querySelector('.form-section.active')?.id;
+    if (active === 'form-login')    window.doLogin();
+    if (active === 'form-register') window.doRegister();
+    if (active === 'form-verify')   window.checkVerified();
+});
+
+// Service Worker 無効化済み
+</script>
+</body>
+</html>

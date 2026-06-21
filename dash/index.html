@@ -1,0 +1,2878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f8fafc">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="学習ログ">
+    <title>学習ログ</title>
+    <link rel="icon" href="/image.png" type="image/png">
+    <link rel="apple-touch-icon" href="/image.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        :root {
+            --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom);
+            --bg:       #f8fafc;
+            --bg2:      #ffffff;
+            --bg3:      #f1f5f9;
+            --border:   #e2e8f0;
+            --border2:  #f1f5f9;
+            --text:     #0f172a;
+            --text2:    #64748b;
+            --text3:    #94a3b8;
+            --nav-bg:   rgba(255,255,255,0.88);
+            --card-shadow: 0 1px 3px rgba(15,23,42,0.06);
+        }
+        html.dark {
+            --bg:       #0f172a;
+            --bg2:      #1e293b;
+            --bg3:      #334155;
+            --border:   #334155;
+            --border2:  #1e293b;
+            --text:     #f1f5f9;
+            --text2:    #94a3b8;
+            --text3:    #64748b;
+            --nav-bg:   rgba(15,23,42,0.92);
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        html { font-family:'Inter',sans-serif; color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased;
+               overflow-x:hidden; max-width:100vw; transition:background 0.2s, color 0.2s; }
+        body { margin:0; min-height:100vh; line-height:1.65; background:var(--bg);
+               padding:calc(1rem + var(--sat)) 1rem calc(5.5rem + var(--sab)) 1rem;
+               -webkit-tap-highlight-color:transparent;
+               overflow-x:hidden; max-width:100vw; width:100%; transition:background 0.2s; }
+        button,input,select,textarea { font:inherit; }
+        /* iOSでinput[type=time]が親をはみ出さないよう強制 */
+        input[type="time"], input[type="number"], input[type="text"] {
+            max-width:100%; min-width:0; width:100%;
+        }
+
+        #bottom-nav {
+            position:fixed; bottom:0; left:0; right:0;
+            background:var(--nav-bg);
+            backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+            border-top:1px solid var(--border);
+            display:flex; justify-content:space-around; align-items:center;
+            z-index:60; padding-bottom:var(--sab);
+            transition:background 0.2s, border-color 0.2s;
+        }
+        .bnav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:2px; color:var(--text3); padding:10px 0; cursor:pointer; user-select:none;
+            font-size:10px; font-weight:700; pointer-events:auto; touch-action:manipulation; position:relative; }
+        .bnav-item.active { color:var(--text); }
+        .bnav-pip { width:4px; height:4px; background:currentColor; border-radius:999px; opacity:0; }
+        .bnav-item.active .bnav-pip { opacity:1; }
+        /* 通知バッジ */
+        .bnav-badge { position:absolute; top:6px; right:calc(50% - 14px);
+            width:8px; height:8px; background:#ef4444; border-radius:50%;
+            border:1.5px solid var(--bg); display:none; }
+        .bnav-badge.show { display:block; }
+
+        .page-content { display:none; }
+        .page-content.active { display:block; }
+
+        .stopwatch-card { transition:all 0.2s ease; }
+        .active-glow { box-shadow:0 10px 25px -5px rgba(34,197,94,0.3); border-color:#22c55e !important; }
+
+        .toast-animate { animation:slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from{transform:translate(-50%,20px);opacity:0} to{transform:translate(-50%,0);opacity:1} }
+
+        .no-scrollbar::-webkit-scrollbar { display:none; }
+        .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+
+        #sync-dot { width:6px; height:6px; border-radius:50%; background:#94a3b8; display:inline-block; transition:background 0.3s; }
+        .sync-syncing #sync-dot { background:#f59e0b; animation:blink 0.8s infinite; }
+        .sync-ok      #sync-dot { background:#22c55e; }
+        .sync-err     #sync-dot { background:#ef4444; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* Calendar */
+        .cal-day {
+            aspect-ratio:1/1; border-radius:10px;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            cursor:pointer; transition:background 0.15s; position:relative;
+            font-size:11px; font-weight:700; gap:2px; min-height:44px;
+            border: 2px solid transparent; color:var(--text);
+        }
+        .cal-day:hover { background:var(--bg3); }
+        .cal-day.today { background:var(--text) !important; color:var(--bg) !important; }
+        .cal-day.has-data { background:var(--bg3); }
+        .cal-day.other-month { opacity:0.2; pointer-events:none; }
+        .cal-day.selected { border-color:var(--text2) !important; }
+        .cal-bar-wrap { display:flex; gap:1px; align-items:flex-end; height:14px; width:80%; }
+        .cal-bar { border-radius:2px; flex:1; min-width:2px; }
+        .cal-total { font-size:8px; font-weight:800; color:var(--text3); line-height:1; }
+        .cal-day.today .cal-total { color:rgba(255,255,255,0.6); }
+
+        #detail-panel { animation: fadeSlide 0.2s ease-out; }
+        @keyframes fadeSlide { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        .spinner { width:16px; height:16px; border:2px solid rgba(15,23,42,0.15);
+            border-top-color:#0f172a; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
+        /* ダークモード上書き */
+        html.dark .bg-white { background-color:var(--bg2) !important; }
+        html.dark .bg-slate-50 { background-color:var(--bg3) !important; }
+        html.dark .bg-slate-100 { background-color:#334155 !important; }
+        html.dark .bg-slate-900 { background-color:#f1f5f9 !important; }
+        html.dark .text-slate-900 { color:var(--text) !important; }
+        html.dark .text-slate-700 { color:#cbd5e1 !important; }
+        html.dark .text-slate-600 { color:#94a3b8 !important; }
+        html.dark .text-slate-500 { color:#64748b !important; }
+        html.dark .text-white { color:#0f172a !important; }
+        html.dark .border-slate-200 { border-color:var(--border) !important; }
+        html.dark .border-slate-100 { border-color:#334155 !important; }
+        html.dark .shadow-sm { box-shadow:0 1px 3px rgba(0,0,0,0.3) !important; }
+        html.dark select, html.dark input, html.dark textarea { background-color:#334155 !important; color:var(--text) !important; border-color:#475569 !important; }
+        html.dark .hover\:bg-slate-100:hover { background-color:#334155 !important; }
+        html.dark .hover\:bg-slate-200:hover { background-color:#475569 !important; }
+        html.dark #bottom-nav .bnav-item svg { stroke:currentColor; }
+        html.dark .cal-day:hover { background:#334155 !important; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+    </style>
+</head>
+<body>
+<script>
+// ページ読み込み直後にダークモードを即適用（ちらつき防止）
+(function(){
+    const pref = localStorage.getItem('darkPref') || 'system';
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = pref === 'dark' || (pref === 'system' && sysDark);
+    if (dark) document.documentElement.classList.add('dark');
+})();
+</script>
+
+<div class="max-w-4xl mx-auto w-full overflow-x-hidden">
+    <div class="flex items-center justify-between mb-6 pt-2">
+        <div>
+            <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">学習ログ</h1>
+            <p id="dateDisplay" class="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wider"></p>
+        </div>
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400" id="sync-wrap">
+                <div id="sync-dot"></div><span id="sync-txt"></span>
+            </div>
+            <div id="user-badge" class="hidden text-[10px] font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full max-w-[110px] truncate"></div>
+        </div>
+    </div>
+
+    <!-- LOG PAGE -->
+    <div id="page-log" class="page-content active">
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+                <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">今日の総学習時間</h2>
+                <span id="totalDisplay" class="text-4xl font-extrabold text-slate-900 tracking-tighter sm:text-5xl">00:00:00</span>
+            </div>
+            <div id="summaryContainer" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
+        </div>
+
+        <!-- 生活ログカード -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">生活ログ</h2>
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">起床時間</label>
+                    <div class="flex gap-2 items-center">
+                        <select id="lifeWakeH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">時</span>
+                        <select id="lifeWakeM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">就寝時間</label>
+                    <div class="flex gap-2 items-center">
+                        <select id="lifeSleepH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">時</span>
+                        <select id="lifeSleepM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">スクリーンタイム</label>
+                    <div class="flex gap-2 items-center">
+                        <select id="lifeScreenH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">時間</span>
+                        <select id="lifeScreenM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                        <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                    </div>
+                </div>
+            </div>
+            <button onclick="saveLifeLog()" class="mt-4 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all text-xs active:scale-95">保存する</button>
+        </div>
+
+        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm mb-6">
+            <div class="flex flex-col gap-3">
+                <input type="text" id="taskNameInput" placeholder="学習内容を入力"
+                       class="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-sm">
+                <div class="flex gap-3">
+                    <select id="taskTagInput" class="flex-1 px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm appearance-none cursor-pointer">
+                        <option value="国語">国語</option><option value="数学">数学</option>
+                        <option value="英語">英語</option><option value="社会">社会</option>
+                        <option value="理科">理科</option><option value="その他" selected>その他</option>
+                    </select>
+                    <button onclick="createTask()" class="px-7 py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all text-sm active:scale-95">追加</button>
+                </div>
+                <button onclick="openManualModal()" class="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all text-xs active:scale-95">時間を指定して追加</button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-1 no-scrollbar" id="filterBar"></div>
+        <div id="taskList" class="space-y-3 pb-6"></div>
+        <div id="emptyMessage" class="hidden text-center py-16 bg-white rounded-3xl border border-slate-200 text-slate-300">
+            <p class="text-sm font-bold">まだ記録がありません</p>
+        </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div id="page-history" class="page-content">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
+                <div>
+                    <span class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">月間合計</span>
+                    <div id="month-total" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">0h 0m</div>
+                </div>
+                <div class="text-right text-slate-500 text-xs sm:text-sm">カレンダーで日付をタップするとその日の学習量が見られます</div>
+            </div>
+            <div id="month-subject-bars" class="space-y-2"></div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3">
+                <button onclick="moveMonth(-1)" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-all">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <span id="cal-month-label" class="text-sm font-extrabold text-slate-900"></span>
+                <button onclick="moveMonth(1)" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-all">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+            <div class="grid grid-cols-7 px-3 pb-1">
+                <div class="text-[10px] font-bold text-red-400 text-center py-1">日</div>
+                <div class="text-[10px] font-bold text-slate-400 text-center py-1">月</div>
+                <div class="text-[10px] font-bold text-slate-400 text-center py-1">火</div>
+                <div class="text-[10px] font-bold text-slate-400 text-center py-1">水</div>
+                <div class="text-[10px] font-bold text-slate-400 text-center py-1">木</div>
+                <div class="text-[10px] font-bold text-slate-400 text-center py-1">金</div>
+                <div class="text-[10px] font-bold text-blue-400 text-center py-1">土</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 px-3 pb-4" id="cal-grid"></div>
+        </div>
+
+        <div id="detail-panel" class="hidden bg-white rounded-3xl border border-slate-200 shadow-sm p-5 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <div id="detail-date" class="text-sm font-extrabold text-slate-900"></div>
+                    <div id="detail-total" class="text-xs font-bold text-slate-400 mt-0.5"></div>
+                </div>
+                <button onclick="closeDetail()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 transition-all">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <!-- 生活記録セクション -->
+            <div id="detail-life-section" class="mb-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">生活記録</h4>
+                    <button onclick="openLifeEditModal()" id="life-edit-btn" class="text-[10px] font-bold text-slate-400 hover:text-slate-700 transition-all px-2 py-1 rounded-lg bg-white border border-slate-200">編集</button>
+                </div>
+                <div id="detail-life-content" class="flex flex-wrap gap-4 text-xs font-bold text-slate-700"></div>
+            </div>
+            <div id="detail-subject-bars" class="space-y-2 mb-4"></div>
+            <div id="detail-task-list" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- ACCOUNT PAGE -->
+    <div id="page-account" class="page-content">
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-5">ユーザー情報</h2>
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-14 h-14 rounded-full bg-slate-900 flex items-center justify-center text-white font-extrabold text-xl shrink-0" id="account-avatar">-</div>
+                <div>
+                    <div id="account-display-name" class="text-base font-extrabold text-slate-900">-</div>
+                    <div id="account-email" class="text-xs font-bold text-slate-400 mt-0.5"></div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ニックネーム</label>
+                <div class="flex gap-3">
+                    <input type="text" id="nicknameInput" placeholder="ニックネームを入力"
+                           class="flex-1 px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-sm">
+                    <button onclick="saveNickname()" class="px-6 py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all text-sm active:scale-95 shrink-0">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ダークモード -->
+        <div class="bg-white rounded-3xl px-6 py-5 border border-slate-200 shadow-sm mb-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                    <svg id="dark-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                </div>
+                <div>
+                    <div class="text-sm font-extrabold text-slate-900">テーマ</div>
+                    <div class="text-[10px] font-bold text-slate-400" id="dark-label">システムに従う</div>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="setDarkPref('system')" id="dark-btn-system"
+                        class="flex-1 py-2.5 text-xs font-bold rounded-2xl border-2 transition-all active:scale-95">
+                    <svg width="16" height="16" class="mx-auto mb-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    システム
+                </button>
+                <button onclick="setDarkPref('light')" id="dark-btn-light"
+                        class="flex-1 py-2.5 text-xs font-bold rounded-2xl border-2 transition-all active:scale-95">
+                    <svg width="16" height="16" class="mx-auto mb-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    ライト
+                </button>
+                <button onclick="setDarkPref('dark')" id="dark-btn-dark"
+                        class="flex-1 py-2.5 text-xs font-bold rounded-2xl border-2 transition-all active:scale-95">
+                    <svg width="16" height="16" class="mx-auto mb-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                    ダーク
+                </button>
+            </div>
+        </div>
+
+        <!-- 科目管理 -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">科目管理</h2>
+            <div id="subject-list" class="flex flex-wrap gap-2 mb-4"></div>
+            <div class="flex gap-3">
+                <input type="text" id="newSubjectInput" placeholder="科目名を入力" maxlength="10"
+                       class="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-sm">
+                <button onclick="addSubject()" class="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all text-sm active:scale-95 shrink-0">追加</button>
+            </div>
+            <p class="text-[10px] font-bold text-slate-300 mt-3">※ デフォルトの5教科は削除できません</p>
+        </div>
+
+        <!-- インサイト -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">インサイト</h2>
+            <div class="flex flex-col gap-2">
+                <button onclick="openInsight('study')" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="13" y="8" width="3" height="10"/><rect x="19" y="14" width="0" height="0"/></svg>
+                        <span>勉強時間グラフ</span>
+                    </div>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button onclick="openInsight('rhythm')" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        <span>睡眠リズムグラフ</span>
+                    </div>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button onclick="openInsight('sleep')" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                        <span>睡眠時間レポート</span>
+                    </div>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button onclick="openInsight('screen')" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                        <span>スクリーンタイムグラフ</span>
+                    </div>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button onclick="openInsight('weekly')" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                    <div class="flex items-center gap-3">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></svg>
+                        <span>週間サマリー</span>
+                    </div>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- ご意見箱 -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <div class="flex items-center gap-2 mb-1">
+                <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">ご意見箱</h2>
+                <span id="admin-badge" class="hidden px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-50 text-amber-600 border border-amber-200">管理者</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mb-4">機能の要望・バグ報告など何でもどうぞ</p>
+            <textarea id="feedbackText" placeholder="ご意見・ご要望を入力してください" rows="4"
+                      class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-sm resize-none"></textarea>
+            <button onclick="sendFeedback()" class="mt-3 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all text-xs active:scale-95">送信する</button>
+            <div id="my-feedback-list" class="mt-4 space-y-2"></div>
+        </div>
+
+        <!-- 管理者：意見一覧（管理者のみ表示） -->
+        <div id="admin-feedback-panel" class="hidden bg-white rounded-3xl p-6 border border-amber-200 shadow-sm mb-5">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">受信した意見</h2>
+                    <span id="admin-feedback-count" class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-slate-100 text-slate-500">0件</span>
+                </div>
+                <button onclick="loadAdminFeedback()" class="text-[10px] font-bold text-slate-400 hover:text-slate-700 transition-all">更新</button>
+            </div>
+            <div id="admin-feedback-list" class="space-y-3">
+                <p class="text-xs font-bold text-slate-300 text-center py-4">読み込み中...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">お知らせ</h2>
+            <button onclick="openNotices()" class="w-full py-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 flex items-center justify-between px-5">
+                <div class="flex items-center gap-3">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                    <span>アップデート履歴</span>
+                </div>
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+        </div>
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-5">
+            <h2 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">アカウント操作</h2>
+            <div class="flex flex-col gap-3">
+                <button onclick="doSignOut()" class="w-full py-4 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-red-100">ログアウト</button>
+                <button onclick="openDeleteAccount()" class="w-full py-4 bg-white hover:bg-red-50 text-red-300 hover:text-red-500 font-bold rounded-2xl transition-all text-sm active:scale-95 border border-slate-100 hover:border-red-100">アカウントを削除する</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<nav id="bottom-nav">
+    <div class="bnav-item active" data-tab="log">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <span>ログ</span><div class="bnav-pip"></div>
+    </div>
+    <div class="bnav-item" data-tab="history">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span>過去の記録</span><div class="bnav-pip"></div>
+    </div>
+    <div class="bnav-item" data-tab="account">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>アカウント</span><div class="bnav-pip"></div>
+        <div class="bnav-badge" id="account-badge"></div>
+    </div>
+    </div>
+</nav>
+
+<!-- 返信モーダル -->
+<div id="replyModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-6 backdrop-blur-sm" onclick="closeReplyModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6" onclick="event.stopPropagation()">
+        <h3 class="text-sm font-extrabold text-slate-900 mb-1">返信を送る</h3>
+        <p id="reply-target" class="text-[10px] font-bold text-slate-400 mb-4"></p>
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+            <p id="reply-original-text" class="text-xs font-bold text-slate-500 leading-relaxed whitespace-pre-wrap max-h-24 overflow-y-auto no-scrollbar"></p>
+        </div>
+        <textarea id="replyText" placeholder="返信内容を入力してください" rows="4"
+                  class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-slate-900 focus:bg-white transition-all text-sm resize-none mb-4"></textarea>
+        <div id="reply-err" class="text-[11px] font-bold text-red-500 mb-2 min-h-[16px]"></div>
+        <div class="flex gap-3">
+            <button onclick="closeReplyModal()" class="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl text-sm transition-all">キャンセル</button>
+            <button onclick="sendReply()" id="reply-send-btn" class="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm transition-all active:scale-95">送信する</button>
+        </div>
+    </div>
+</div>
+
+<!-- 生活ログ編集モーダル（過去の日付） -->
+<div id="lifeEditModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-6 backdrop-blur-sm" onclick="closeLifeEditModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h3 class="text-sm font-extrabold text-slate-900">生活ログを編集</h3>
+                <p id="life-edit-date-label" class="text-[10px] font-bold text-slate-400 mt-0.5"></p>
+            </div>
+            <button onclick="closeLifeEditModal()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 transition-all">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="flex flex-col gap-4">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">起床時間</label>
+                <div class="flex gap-2 items-center">
+                    <select id="lifeEditWakeH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">時</span>
+                    <select id="lifeEditWakeM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">就寝時間</label>
+                <div class="flex gap-2 items-center">
+                    <select id="lifeEditSleepH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">時</span>
+                    <select id="lifeEditSleepM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">スクリーンタイム</label>
+                <div class="flex gap-2 items-center">
+                    <select id="lifeEditScreenH" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">時間</span>
+                    <select id="lifeEditScreenM" class="flex-1 px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm cursor-pointer"></select>
+                    <span class="font-extrabold text-slate-400 shrink-0">分</span>
+                </div>
+            </div>
+        </div>
+        <div id="life-edit-err" class="text-[11px] font-bold text-red-500 mt-3 min-h-[16px]"></div>
+        <div class="flex gap-3 mt-4">
+            <button onclick="closeLifeEditModal()" class="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl text-sm transition-all">キャンセル</button>
+            <button onclick="saveLifeEditModal()" id="life-edit-save-btn" class="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm transition-all active:scale-95">保存する</button>
+        </div>
+    </div>
+</div>
+
+<!-- アカウント削除確認モーダル -->
+<div id="deleteAccountModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-6 backdrop-blur-sm" onclick="closeDeleteAccount()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6" onclick="event.stopPropagation()">
+        <div class="text-center mb-5">
+            <div class="flex justify-center mb-3">
+                <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                    <svg width="24" height="24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+            </div>
+            <h3 class="text-sm font-extrabold text-slate-900 mb-2">アカウントを削除しますか？</h3>
+            <p class="text-xs font-bold text-slate-400 leading-relaxed">この操作は取り消せません。<br>学習データ・生活ログ・設定がすべて削除されます。</p>
+        </div>
+        <div class="mb-4">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">確認のためパスワードを入力</label>
+            <input type="password" id="delete-pass-input" placeholder="パスワード"
+                   class="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold placeholder:text-slate-300 focus:outline-none focus:border-red-300 focus:bg-white transition-all text-sm">
+            <div id="delete-err" class="text-[11px] font-bold text-red-500 mt-2 min-h-[16px]"></div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeDeleteAccount()" class="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl text-sm transition-all">キャンセル</button>
+            <button onclick="doDeleteAccount()" id="delete-confirm-btn" class="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-2xl text-sm transition-all active:scale-95">削除する</button>
+        </div>
+    </div>
+</div>
+
+<!-- インサイトモーダル -->
+<div id="insightModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm" onclick="closeInsight()">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl shadow-xl w-full sm:w-auto sm:min-w-[420px] sm:max-w-lg flex flex-col" style="max-height:85dvh;" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+            <h3 id="insight-title" class="text-sm font-extrabold text-slate-900">レポート</h3>
+            <button onclick="closeInsight()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 transition-all">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto overscroll-contain px-6 py-4 no-scrollbar" style="padding-bottom:1.5rem;">
+            <div id="insight-body">
+                <p class="text-xs font-bold text-slate-300 text-center py-8">読み込み中...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- お知らせモーダル -->
+<div id="noticesModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm" onclick="closeNotices()">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl shadow-xl w-full sm:w-auto sm:min-w-[420px] sm:max-w-lg flex flex-col" style="max-height:85dvh;" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+            <h3 class="text-sm font-extrabold text-slate-900">アップデート履歴</h3>
+            <button onclick="closeNotices()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 transition-all">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-4 no-scrollbar" style="padding-bottom:1.5rem;">
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.16</span>
+                        <span class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-blue-50 text-blue-600">NEW</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">手入力の秒対応・テーマ設定の保存先を改善</div>
+                    <div class="text-xs font-bold text-slate-400">学習時間の手入力で時間・分・秒まで指定できるようになりました。またテーマ設定はFirestoreに保存されるようになり、キャッシュを消しても設定が保持されます。アプリ全体から絵文字表示を廃止しました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.16</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">アカウントページをすっきり整理</div>
+                    <div class="text-xs font-bold text-slate-400">勉強時間グラフ・睡眠リズムグラフを常設表示からインサイト欄のボタンに統合しました。アカウントページがよりシンプルになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.16</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">インサイト機能を追加</div>
+                    <div class="text-xs font-bold text-slate-400">アカウントページに「インサイト」欄を追加。睡眠時間レポート、スクリーンタイムグラフ、週間サマリー（勉強時間・睡眠平均・連続学習日数）を確認できるようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.16</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">テーマ設定をシステム連動に対応</div>
+                    <div class="text-xs font-bold text-slate-400">テーマ設定が「システム / ライト / ダーク」の3択になりました。デフォルトはOSの設定に自動で従い、手動で上書きすることもできます。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.16</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">ダークモード・通知バッジを追加</div>
+                    <div class="text-xs font-bold text-slate-400">アカウントページにダークモード切り替えを追加。夜の勉強に最適です。また管理者から返信が届くとアカウントタブに赤い通知バッジが表示されるようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.13</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">勉強時間グラフ・ご意見への返信機能を追加</div>
+                    <div class="text-xs font-bold text-slate-400">アカウントページに科目別の勉強時間グラフ（週・月表示）を追加しました。また、ご意見箱に送った内容への返信が届くようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.12</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">アカウント削除機能を追加</div>
+                    <div class="text-xs font-bold text-slate-400">アカウントページから自分のアカウントとデータを完全に削除できるようになりました。確認のためパスワード再入力が必要です。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.12</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">新規登録時にメール認証を追加</div>
+                    <div class="text-xs font-bold text-slate-400">新規登録時に認証メールを送信するようになりました。メール内のリンクをクリックして認証を完了してください。届かない場合は迷惑メールフォルダもご確認ください。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.12</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">科目管理・睡眠グラフ・ご意見箱を追加</div>
+                    <div class="text-xs font-bold text-slate-400">自分で科目を追加・削除できるようになりました。起床・就寝時間の折れ線グラフで睡眠リズムを可視化。アカウントページからご意見を送れるようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">2026.06.11</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">アップデート履歴・お知らせ機能を追加</div>
+                    <div class="text-xs font-bold text-slate-400">アカウントページにお知らせ欄を追加しました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.11</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">同名タスクの警告・複数同時タイマー対応</div>
+                    <div class="text-xs font-bold text-slate-400">同じ名前のタスクを作ろうとすると警告を表示。複数タスクを同時に計測できるようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.10</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">過去の記録に学習時間帯を表示</div>
+                    <div class="text-xs font-bold text-slate-400">過去の記録のタスク一覧に「19:00〜19:48」のような学習時間帯を表示するようにしました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.10</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">起床・就寝時間を24時間表記に変更</div>
+                    <div class="text-xs font-bold text-slate-400">iOSで12時間表記になってしまう問題を修正。時・分のプルダウンで24時間固定で選べるようになりました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.09</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">生活ログのリアルタイム保存を修正</div>
+                    <div class="text-xs font-bold text-slate-400">保存後しばらくすると時間がリセットされる問題を修正。Firestoreのリアルタイム監視で常に最新値を保持するようにしました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.09</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">PWAクラッシュ問題を修正</div>
+                    <div class="text-xs font-bold text-slate-400">iOSのホーム画面PWAで「Response served by service worker has redirections」エラーが出て落ちる問題を修正しました。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.08</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">アカウントページを追加</div>
+                    <div class="text-xs font-bold text-slate-400">ニックネームの設定・編集、ログアウト機能をアカウントページに集約しました。ニックネームが未設定の場合はメールアドレスを表示します。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                    <div class="w-px flex-1 bg-slate-200"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2026.06.08</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">生活ログ機能を追加</div>
+                    <div class="text-xs font-bold text-slate-400">起床時間・就寝時間・スクリーンタイムを日単位で記録できるようになりました。過去の記録でも確認できます。</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="shrink-0 flex flex-col items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-slate-900 mt-1.5"></div>
+                </div>
+                <div>
+                    <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">〜2026.06.07</div>
+                    <div class="text-xs font-extrabold text-slate-900 mb-1">学習ログアプリ 初期リリース</div>
+                    <div class="text-xs font-bold text-slate-400">タイマー・科目別集計・カレンダー・月間集計・Firebase認証・PWA対応。</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="manualModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6">
+        <h3 class="text-sm font-extrabold text-slate-900 mb-4">学習時間を手入力</h3>
+
+        <div class="flex gap-2 mb-4">
+            <button onclick="setManualMode('duration')" id="manual-mode-duration" class="flex-1 py-2.5 text-xs font-bold rounded-2xl transition-all">経過時間</button>
+            <button onclick="setManualMode('range')" id="manual-mode-range" class="flex-1 py-2.5 text-xs font-bold rounded-2xl transition-all">開始〜終了</button>
+        </div>
+
+        <!-- 経過時間入力 -->
+        <div id="manual-panel-duration" class="space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">学習時間</label>
+                <div class="flex gap-2 items-center">
+                    <div class="flex-1">
+                        <input type="number" id="manualHoursInput" placeholder="0" min="0" inputmode="numeric"
+                               class="w-full px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-xl text-center focus:outline-none focus:border-slate-900 transition-all">
+                        <div class="text-center text-[10px] font-bold text-slate-300 mt-1">時間</div>
+                    </div>
+                    <span class="font-extrabold text-slate-300 text-xl pb-5">:</span>
+                    <div class="flex-1">
+                        <input type="number" id="manualMinutesInput" placeholder="0" min="0" max="59" inputmode="numeric"
+                               class="w-full px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-xl text-center focus:outline-none focus:border-slate-900 transition-all">
+                        <div class="text-center text-[10px] font-bold text-slate-300 mt-1">分</div>
+                    </div>
+                    <span class="font-extrabold text-slate-300 text-xl pb-5">:</span>
+                    <div class="flex-1">
+                        <input type="number" id="manualSecondsInput" placeholder="0" min="0" max="59" inputmode="numeric"
+                               class="w-full px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-xl text-center focus:outline-none focus:border-slate-900 transition-all">
+                        <div class="text-center text-[10px] font-bold text-slate-300 mt-1">秒</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 開始〜終了入力 -->
+        <div id="manual-panel-range" class="hidden space-y-4">
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">開始</label>
+                    <input type="time" id="manualStartTime" onchange="updateManualRangePreview()"
+                           class="w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
+                           style="min-width:0;max-width:100%;">
+                </div>
+                <span class="font-extrabold text-slate-300 pb-3">〜</span>
+                <div class="flex-1">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">終了</label>
+                    <input type="time" id="manualEndTime" onchange="updateManualRangePreview()"
+                           class="w-full px-3 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-700 focus:outline-none focus:border-slate-900 transition-all text-sm"
+                           style="min-width:0;max-width:100%;">
+                </div>
+            </div>
+            <p id="manual-range-preview" class="text-[11px] font-bold text-slate-400 text-center min-h-[16px]"></p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+            <button onclick="closeManualModal()" class="flex-1 py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl text-xs transition-all">戻る</button>
+            <button onclick="addManualTask()" class="flex-1 py-4 bg-slate-900 text-white font-bold rounded-2xl text-xs transition-all">保存する</button>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDKs (CDN imports) - importmap removed for broader browser support -->
+
+<!-- グローバルスタブ: モジュール読み込み前に onclick が呼ばれても安全にキューイング -->
+<script>
+(function() {
+    var _queue = {};
+    var proxyFn = function(name) {
+        return function() {
+            var args = arguments;
+            if (window['_impl_' + name]) {
+                window['_impl_' + name].apply(null, args);
+            } else {
+                _queue[name] = _queue[name] || [];
+                _queue[name].push(args);
+            }
+        };
+    };
+    var fns = [
+        'switchPage','doSignOut','createTask','toggleTask','resetTask','deleteTask',
+        'addManualTask','openManualModal','closeManualModal','moveMonth','closeDetail','showToast',
+        'saveLifeLog','saveNickname','openNotices','closeNotices','addSubject','removeSubject','sendFeedback','setGraphRange','setStudyGraphRange','loadAdminFeedback','openDeleteAccount','closeDeleteAccount','doDeleteAccount','openReplyModal','closeReplyModal','sendReply','deleteFeedback','setDarkPref','openInsight','closeInsight','openLifeEditModal','closeLifeEditModal','saveLifeEditModal','setManualMode','updateManualRangePreview'
+    ];
+    fns.forEach(function(n) { window[n] = proxyFn(n); });
+
+    window._registerImpl = function(name, fn) {
+        window['_impl_' + name] = fn;
+        window[name] = fn;
+        if (_queue[name]) {
+            _queue[name].forEach(function(args) { fn.apply(null, args); });
+            delete _queue[name];
+        }
+    };
+})();
+</script>
+
+<script type="module">
+import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signOut, onAuthStateChanged, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocFromServer, setDoc, query, orderBy, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey:            "AIzaSyAjvzxaHb7bwgW0vr_Nt0r1-HxFHtSyiZk",
+    authDomain:        "myda-fcef9.firebaseapp.com",
+    projectId:         "myda-fcef9",
+    storageBucket:     "myda-fcef9.firebasestorage.app",
+    messagingSenderId: "869826704788",
+    appId:             "1:869826704788:web:c2b03a56d79b49cd7e8b81",
+    measurementId:     "G-LHC57PYMWR"
+};
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+/* ── Constants ── */
+const DEFAULT_TAG_CONFIG = {
+    '国語': { text:'text-red-600',    bar:'bg-red-500',    hex:'#ef4444', bg:'bg-red-50'    },
+    '数学': { text:'text-blue-600',   bar:'bg-blue-500',   hex:'#3b82f6', bg:'bg-blue-50'   },
+    '英語': { text:'text-green-600',  bar:'bg-green-500',  hex:'#22c55e', bg:'bg-green-50'  },
+    '社会': { text:'text-orange-600', bar:'bg-orange-500', hex:'#f97316', bg:'bg-orange-50' },
+    '理科': { text:'text-purple-600', bar:'bg-purple-500', hex:'#a855f7', bg:'bg-purple-50' },
+    'その他':{ text:'text-slate-600',  bar:'bg-slate-400',  hex:'#94a3b8', bg:'bg-slate-50'  }
+};
+// カスタム科目用カラーパレット
+const CUSTOM_COLORS = [
+    { text:'text-pink-600',    bar:'bg-pink-500',    hex:'#ec4899', bg:'bg-pink-50'    },
+    { text:'text-cyan-600',    bar:'bg-cyan-500',    hex:'#06b6d4', bg:'bg-cyan-50'    },
+    { text:'text-yellow-600',  bar:'bg-yellow-500',  hex:'#eab308', bg:'bg-yellow-50'  },
+    { text:'text-indigo-600',  bar:'bg-indigo-500',  hex:'#6366f1', bg:'bg-indigo-50'  },
+    { text:'text-teal-600',    bar:'bg-teal-500',    hex:'#14b8a6', bg:'bg-teal-50'    },
+    { text:'text-rose-600',    bar:'bg-rose-500',    hex:'#f43f5e', bg:'bg-rose-50'    },
+    { text:'text-amber-600',   bar:'bg-amber-500',   hex:'#f59e0b', bg:'bg-amber-50'   },
+    { text:'text-lime-600',    bar:'bg-lime-500',    hex:'#84cc16', bg:'bg-lime-50'    },
+];
+let TAG_CONFIG = { ...DEFAULT_TAG_CONFIG };
+let TAGS = Object.keys(TAG_CONFIG);
+const DEFAULT_TAGS = Object.keys(DEFAULT_TAG_CONFIG);
+
+/* ── State ── */
+let currentUser  = null;
+let tasks        = [];
+let currentFilter = 'すべて';
+let taskUnsub    = null;
+let calYear, calMonth;
+let historyCache = {};
+let historyLifeCache = {}; // 生活ログキャッシュ
+let selectedCalDate = null;
+let syncTimer;
+
+/* ── Auth gate ── */
+onAuthStateChanged(auth, user => {
+    if (!user) { location.href = '../index.html'; return; }
+    if (!user.emailVerified) {
+        // 未認証ユーザーはログイン画面に戻す
+        location.href = '../index.html';
+        return;
+    }
+    currentUser = user;
+    initApp();
+});
+
+async function initApp() {
+    const now = new Date();
+    document.getElementById('dateDisplay').innerText =
+        now.toLocaleDateString('ja-JP', { month:'short', day:'numeric', weekday:'short' });
+    const today = new Date();
+    calYear  = today.getFullYear();
+    calMonth = today.getMonth();
+    buildFilterBar();
+    renderSummary();
+    await loadCustomSubjects();
+    buildTimeSelects();
+    subscribeToday();
+    subscribeLifeLog();
+    initLifeFormDirtyWatch();
+    await loadUserProfile();
+    renderSubjectList();
+    startNotifWatch();
+
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1)) {
+        const s = document.createElement('style');
+        s.textContent = '.font-extrabold,.font-black{font-weight:600!important}.font-bold{font-weight:500!important}';
+        document.head.appendChild(s);
+    }
+}
+
+/* ── User profile (nickname) ── */
+// 管理者判定は Firestore の users/{uid} ドキュメントの isAdmin フィールドで行います。
+// 管理者にしたいユーザーの Firestore ドキュメント（users/{そのユーザーのuid}）に
+// 手動で { isAdmin: true } を追加してください（Firebase Console から設定できます）。
+// コード上にメールアドレスを書く必要はありません。
+let isAdmin = false;
+
+async function loadUserProfile() {
+    try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const snap = await getDoc(userDocRef);
+        const data = snap.exists() ? snap.data() : {};
+        const nickname = data.nickname || '';
+        const email = currentUser.email || '';
+        isAdmin = data.isAdmin === true;
+
+        // ヘッダーのユーザーバッジ
+        const badge = document.getElementById('user-badge');
+        badge.textContent = nickname || email;
+        badge.classList.remove('hidden');
+
+        // アカウントページ
+        const displayName = nickname || email;
+        document.getElementById('account-display-name').textContent = displayName;
+        document.getElementById('account-email').textContent = email;
+        document.getElementById('nicknameInput').value = nickname;
+
+        // アバター頭文字
+        const avatarChar = (nickname || email || '?')[0].toUpperCase();
+        document.getElementById('account-avatar').textContent = avatarChar;
+
+        // テーマ設定をFirestoreから読み込み、localStorageに同期
+        const savedDarkPref = data.darkPref;
+        if (savedDarkPref) {
+            localStorage.setItem('darkPref', savedDarkPref);
+        }
+        syncDarkToggle();
+
+        // 管理者バッジ・意見一覧パネル
+        if (isAdmin) {
+            document.getElementById('admin-badge')?.classList.remove('hidden');
+            document.getElementById('admin-feedback-panel')?.classList.remove('hidden');
+            loadAdminFeedback();
+        }
+    } catch(e) {
+        console.error('loadUserProfile error', e);
+    }
+}
+
+/* ── Life log ── */
+let lifeUnsub = null;
+let lifeFormDirty = false;
+
+function buildTimeSelects() {
+    ['lifeWakeH','lifeSleepH'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerHTML = '<option value="">--</option>' +
+            Array.from({length:24},(_,i)=>i).map(h=>`<option value="${String(h).padStart(2,'0')}">${String(h).padStart(2,'0')}</option>`).join('');
+    });
+    ['lifeWakeM','lifeSleepM'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerHTML = '<option value="">--</option>' +
+            Array.from({length:60},(_,i)=>i).map(m=>`<option value="${String(m).padStart(2,'0')}">${String(m).padStart(2,'0')}</option>`).join('');
+    });
+    buildScreenTimeSelects('lifeScreenH','lifeScreenM');
+}
+
+// スクリーンタイム（経過時間）の時・分セレクトを生成
+function buildScreenTimeSelects(hId, mId) {
+    const hEl = document.getElementById(hId);
+    const mEl = document.getElementById(mId);
+    if (hEl) hEl.innerHTML = Array.from({length:13},(_,i)=>i).map(h=>`<option value="${h}">${h}</option>`).join('');
+    if (mEl) mEl.innerHTML = Array.from({length:60},(_,i)=>i).map(m=>`<option value="${m}">${String(m).padStart(2,'0')}</option>`).join('');
+}
+
+function setScreenTimeSelects(hId, mId, totalMinutes) {
+    const hEl = document.getElementById(hId);
+    const mEl = document.getElementById(mId);
+    if (totalMinutes == null) {
+        if (hEl) hEl.value = 0;
+        if (mEl) mEl.value = 0;
+        return;
+    }
+    if (hEl) hEl.value = Math.floor(totalMinutes / 60);
+    if (mEl) mEl.value = totalMinutes % 60;
+}
+
+function getScreenTimeMinutes(hId, mId) {
+    const h = parseInt(document.getElementById(hId)?.value);
+    const m = parseInt(document.getElementById(mId)?.value);
+    if (isNaN(h) && isNaN(m)) return null;
+    return (h||0)*60 + (m||0);
+}
+
+function setTimeSelects(prefix, timeStr) {
+    const parts = (timeStr || '').split(':');
+    const h = parts[0] || ''; const m = parts[1] || '';
+    const hEl = document.getElementById(prefix+'H');
+    const mEl = document.getElementById(prefix+'M');
+    if (hEl) hEl.value = h;
+    if (mEl) mEl.value = m;
+}
+
+function getTimeFromSelects(prefix) {
+    const h = document.getElementById(prefix+'H')?.value || '';
+    const m = document.getElementById(prefix+'M')?.value || '';
+    if (!h || !m) return null;
+    return `${h}:${m}`;
+}
+
+function subscribeLifeLog() {
+    if (lifeUnsub) lifeUnsub();
+    const dayRef = doc(db, 'users', currentUser.uid, 'days', todayStr());
+    lifeUnsub = onSnapshot(dayRef, snap => {
+        if (lifeFormDirty) return;
+        if (snap.exists()) {
+            const data = snap.data();
+            setTimeSelects('lifeWake',  data.wakeTime  || '');
+            setTimeSelects('lifeSleep', data.sleepTime || '');
+            setScreenTimeSelects('lifeScreenH','lifeScreenM', data.screenTime);
+        } else {
+            setTimeSelects('lifeWake',  '');
+            setTimeSelects('lifeSleep', '');
+            setScreenTimeSelects('lifeScreenH','lifeScreenM', null);
+        }
+    }, err => { console.error('subscribeLifeLog error', err); });
+}
+
+function initLifeFormDirtyWatch() {
+    ['lifeWakeH','lifeWakeM','lifeSleepH','lifeSleepM','lifeScreenH','lifeScreenM'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.addEventListener('focus',  () => { lifeFormDirty = true; });
+        el.addEventListener('blur',   () => { lifeFormDirty = false; });
+        el.addEventListener('change', () => { lifeFormDirty = true; });
+    });
+}
+
+/* ── Helpers ── */
+function todayStr() {
+    const now = new Date();
+    if (now.getHours() < 4) now.setDate(now.getDate() - 1);
+    return fmtDate(now);
+}
+function fmtDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtTime(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v=>String(v).padStart(2,'0')).join(':');
+}
+function fmtHM(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function fmtScreenTime(mins) {
+    if (mins == null || mins === '') return '未記録';
+    const m = parseInt(mins);
+    if (isNaN(m)) return '未記録';
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    if (h > 0 && rem > 0) return `${h}時間${rem}分`;
+    if (h > 0) return `${h}時間`;
+    return `${rem}分`;
+}
+function tasksCol(dateStr) { return collection(db,'users',currentUser.uid,'days',dateStr,'tasks'); }
+function taskDocRef(dateStr,id) { return doc(db,'users',currentUser.uid,'days',dateStr,'tasks',id); }
+
+/* ── Sync UI ── */
+function setSyncState(state) {
+    const wrap = document.getElementById('sync-wrap');
+    const txt  = document.getElementById('sync-txt');
+    wrap.className = 'flex items-center gap-1.5 text-[10px] font-bold text-slate-400 sync-' + state;
+    txt.textContent = {syncing:'同期中',ok:'同期済み',err:'エラー'}[state]||'';
+    clearTimeout(syncTimer);
+    if (state==='ok') syncTimer = setTimeout(()=>{ txt.textContent=''; },2500);
+}
+
+/* ── Realtime today ── */
+function subscribeToday() {
+    if (taskUnsub) taskUnsub();
+    setSyncState('syncing');
+    taskUnsub = onSnapshot(
+        query(tasksCol(todayStr()), orderBy('createdAt','asc')),
+        snap => {
+            const newTasks = snap.docs.map(d => {
+                const existing = tasks.find(t => t.id===d.id);
+                return { ...d.data(), id:d.id, intervalId: existing?.intervalId ?? null };
+            });
+            newTasks.forEach(task => {
+                if (task.isRunning && !task.intervalId && task.sessionStartTime) {
+                    task.elapsedSeconds = task.preSessionElapsed + (Date.now()-task.sessionStartTime)/1000;
+                    startTaskInterval(task);
+                }
+            });
+            tasks = newTasks;
+            historyCache[todayStr()] = tasks;
+            renderAll();
+            setSyncState('ok');
+        },
+        err => { console.error(err); setSyncState('err'); }
+    );
+}
+
+/* ── Timer ── */
+function startTaskInterval(task) {
+    if (task.intervalId) clearInterval(task.intervalId);
+    task.intervalId = setInterval(() => {
+        task.elapsedSeconds = task.preSessionElapsed + (Date.now()-task.sessionStartTime)/1000;
+        const el = document.getElementById('display-'+task.id);
+        if (el) el.innerText = fmtTime(task.elapsedSeconds);
+        updateSummaryLive();
+    }, 250);
+}
+
+/* ── Render ── */
+function renderAll() { renderSummary(); renderTasks(); }
+
+function renderSummary() {
+    const c = document.getElementById('summaryContainer'); if (!c) return;
+    c.innerHTML = TAGS.map(tag => `
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-extrabold ${TAG_CONFIG[tag].text} uppercase tracking-widest">${tag}</span>
+                <span id="summary-time-${tag}" class="text-xs font-bold text-slate-900">00:00:00</span>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div id="summary-bar-${tag}" class="h-full ${TAG_CONFIG[tag].bar} rounded-full" style="width:0%;transition:width 0.4s ease;"></div>
+            </div>
+        </div>
+    `).join('');
+    updateSummaryLive();
+}
+
+function updateSummaryLive() {
+    let grand = 0;
+    const totals = {};
+    TAGS.forEach(t => totals[t]=0);
+    tasks.forEach(t => { if(totals[t.tag]!==undefined) totals[t.tag]+=t.elapsedSeconds; grand+=t.elapsedSeconds; });
+    const td = document.getElementById('totalDisplay');
+    if (td) td.textContent = fmtTime(grand);
+    TAGS.forEach(tag => {
+        const te = document.getElementById('summary-time-'+tag);
+        const be = document.getElementById('summary-bar-'+tag);
+        if (te) te.textContent = fmtTime(totals[tag]);
+        if (be) be.style.width = (grand>0?(totals[tag]/grand)*100:0)+'%';
+    });
+}
+
+function buildFilterBar() {
+    const bar = document.getElementById('filterBar'); if (!bar) return;
+    bar.innerHTML = '';
+    ['すべて',...TAGS].forEach(tag => {
+        const btn = document.createElement('button');
+        btn.className = 'px-5 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap border ' +
+            (currentFilter===tag ? 'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-100');
+        btn.textContent = tag;
+        btn.onclick = () => { currentFilter=tag; buildFilterBar(); renderTasks(); };
+        bar.appendChild(btn);
+    });
+}
+
+function renderTasks() {
+    const list  = document.getElementById('taskList');
+    const empty = document.getElementById('emptyMessage');
+    if (!list||!empty) return;
+    const filtered = currentFilter==='すべて' ? tasks : tasks.filter(t=>t.tag===currentFilter);
+    if (!filtered.length) { list.innerHTML=''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    list.innerHTML = filtered.map(task => {
+        const cfg = TAG_CONFIG[task.tag]||TAG_CONFIG['その他'];
+        return `
+            <div class="stopwatch-card bg-white rounded-2xl border-2 border-slate-100 overflow-hidden ${task.isRunning?'active-glow':''}">
+                <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 text-[9px] font-bold rounded-full ${cfg.bg} ${cfg.text}">${task.tag}</span>
+                            <h3 class="font-bold text-slate-800 text-sm truncate">${task.name}</h3>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-400">作成: ${task.startTime}</div>
+                    </div>
+                    <div class="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-0 border-slate-50 pt-3 sm:pt-0">
+                        <div id="display-${task.id}" class="font-bold text-2xl text-slate-900 tracking-tight min-w-[90px]">${fmtTime(task.elapsedSeconds)}</div>
+                        <div class="flex gap-2">
+                            <button onclick="toggleTask('${task.id}')" class="px-5 py-2.5 text-xs font-extrabold rounded-xl text-white transition-all ${task.isRunning?'bg-red-500 hover:bg-red-600':'bg-slate-900 hover:bg-slate-800'}">
+                                ${task.isRunning?'停止':'開始'}
+                            </button>
+                            <button onclick="resetTask('${task.id}')" class="p-2.5 bg-slate-50 text-slate-300 hover:text-slate-600 rounded-xl transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
+                            <button onclick="deleteTask('${task.id}')" class="p-2.5 bg-slate-50 text-slate-200 hover:text-red-500 rounded-xl transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${task.laps&&task.laps.length?`
+                    <div class="bg-slate-50/50 px-5 py-3 border-t border-slate-50 max-h-24 overflow-y-auto no-scrollbar">
+                        ${task.laps.map(lap=>`
+                            <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1 last:mb-0">
+                                <span>${lap.start} - ${lap.end}</span>
+                                <span class="text-slate-600">+${fmtTime(lap.duration)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `:''}
+            </div>
+        `;
+    }).join('');
+}
+
+/* ── Calendar ── */
+async function loadMonthHistory() {
+    if (!currentUser) return;
+    const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    const promises = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        if (historyCache[ds] !== undefined) continue;
+        promises.push(
+            getDocs(collection(db,'users',currentUser.uid,'days',ds,'tasks'))
+                .then(snap => { historyCache[ds] = snap.docs.map(d=>d.data()); })
+                .catch(() => { historyCache[ds] = []; })
+        );
+        // 生活ログも取得
+        if (historyLifeCache[ds] === undefined) {
+            promises.push(
+                getDoc(doc(db,'users',currentUser.uid,'days',ds))
+                    .then(snap => { historyLifeCache[ds] = snap.exists() ? snap.data() : {}; })
+                    .catch(() => { historyLifeCache[ds] = {}; })
+            );
+        }
+    }
+    await Promise.all(promises);
+    renderCalendar();
+    renderMonthSummary();
+}
+
+function renderCalendar() {
+    const grid  = document.getElementById('cal-grid');
+    const label = document.getElementById('cal-month-label');
+    if (!grid||!label) return;
+    label.textContent = `${calYear}年 ${calMonth+1}月`;
+
+    const todayS   = fmtDate(new Date());
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInM  = new Date(calYear, calMonth+1, 0).getDate();
+
+    let maxSec = 0;
+    for (let d=1; d<=daysInM; d++) {
+        const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const total = (historyCache[ds]||[]).reduce((s,t)=>s+t.elapsedSeconds,0);
+        if (total > maxSec) maxSec = total;
+    }
+
+    grid.innerHTML = '';
+    for (let i=0; i<firstDay; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'cal-day other-month';
+        grid.appendChild(blank);
+    }
+    for (let d=1; d<=daysInM; d++) {
+        const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayTasks = historyCache[ds]||[];
+        const totalSec = dayTasks.reduce((s,t)=>s+t.elapsedSeconds,0);
+        const isToday  = ds===todayS;
+        const isSelected = ds===selectedCalDate;
+        const hasData  = totalSec>0;
+
+        const subTotals = {};
+        TAGS.forEach(t=>subTotals[t]=0);
+        dayTasks.forEach(t=>{ if(subTotals[t.tag]!==undefined) subTotals[t.tag]+=t.elapsedSeconds; });
+
+        const barsHtml = hasData
+            ? `<div class="cal-bar-wrap">${TAGS.filter(t=>subTotals[t]>0).map(t=>{
+                const h = Math.max(3, Math.round((subTotals[t]/maxSec)*12));
+                return `<div class="cal-bar" style="background:${TAG_CONFIG[t].hex};height:${h}px"></div>`;
+              }).join('')}</div>` : '';
+        const totalLabel = hasData
+            ? `<div class="cal-total">${Math.floor(totalSec/3600)>0?Math.floor(totalSec/3600)+'h':Math.floor((totalSec%3600)/60)+'m'}</div>` : '';
+
+        const cell = document.createElement('div');
+        cell.className = `cal-day ${isToday?'today':''} ${hasData&&!isToday?'has-data':''} ${isSelected?'selected':''}`;
+        cell.innerHTML = `<span style="font-size:11px;font-weight:${isToday?'800':'700'};line-height:1;">${d}</span>${barsHtml}${totalLabel}`;
+        cell.addEventListener('click', ()=>showDayDetail(ds));
+        grid.appendChild(cell);
+    }
+}
+
+function renderMonthSummary() {
+    const totalEl = document.getElementById('month-total');
+    const barsEl  = document.getElementById('month-subject-bars');
+    if (!totalEl||!barsEl) return;
+
+    const daysInM = new Date(calYear,calMonth+1,0).getDate();
+    let grand = 0;
+    const sub = {};
+    TAGS.forEach(t=>sub[t]=0);
+    for (let d=1; d<=daysInM; d++) {
+        const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        (historyCache[ds]||[]).forEach(t=>{ if(sub[t.tag]!==undefined) sub[t.tag]+=t.elapsedSeconds; grand+=t.elapsedSeconds; });
+    }
+    totalEl.textContent = fmtHM(grand);
+    barsEl.innerHTML = TAGS.filter(t=>sub[t]>0).map(tag=>{
+        const pct = grand>0?(sub[tag]/grand)*100:0;
+        return `
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] font-bold ${TAG_CONFIG[tag].text} w-8 text-right shrink-0">${tag}</span>
+                <div class="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div class="h-full ${TAG_CONFIG[tag].bar} rounded-full" style="width:${pct.toFixed(1)}%;transition:width 0.5s ease;"></div>
+                </div>
+                <span class="text-[10px] font-bold text-slate-500 w-12 shrink-0">${fmtHM(sub[tag])}</span>
+            </div>`;
+    }).join('') || '<p class="text-xs font-bold text-slate-300 text-center py-2">この月はデータがありません</p>';
+}
+
+async function showDayDetail(dateStr) {
+    selectedCalDate = dateStr;
+    renderCalendar();
+    const panel    = document.getElementById('detail-panel');
+    const dayTasks = historyCache[dateStr]||[];
+    const totalSec = dayTasks.reduce((s,t)=>s+t.elapsedSeconds,0);
+    const [y,m,d]  = dateStr.split('-').map(Number);
+    document.getElementById('detail-date').textContent =
+        new Date(y,m-1,d).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+    document.getElementById('detail-total').textContent = '合計 ' + fmtHM(totalSec);
+
+    // 生活記録セクション
+    let lifeData = historyLifeCache[dateStr];
+    if (lifeData === undefined) {
+        try {
+            const snap = await getDoc(doc(db,'users',currentUser.uid,'days',dateStr));
+            lifeData = snap.exists() ? snap.data() : {};
+            historyLifeCache[dateStr] = lifeData;
+        } catch(e) {
+            lifeData = {};
+        }
+    }
+    const lifeContent = document.getElementById('detail-life-content');
+    const wakeVal  = lifeData.wakeTime  || null;
+    const sleepVal = lifeData.sleepTime || null;
+    const screenVal = lifeData.screenTime != null ? lifeData.screenTime : null;
+    lifeContent.innerHTML = `
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">起床</span>
+            <span class="text-sm font-bold text-slate-700">${wakeVal || '未記録'}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">就寝</span>
+            <span class="text-sm font-bold text-slate-700">${sleepVal || '未記録'}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">スクリーン</span>
+            <span class="text-sm font-bold text-slate-700">${screenVal !== null ? fmtScreenTime(screenVal) : '未記録'}</span>
+        </div>
+    `;
+
+    const sub = {};
+    TAGS.forEach(t=>sub[t]=0);
+    dayTasks.forEach(t=>{ if(sub[t.tag]!==undefined) sub[t.tag]+=t.elapsedSeconds; });
+
+    document.getElementById('detail-subject-bars').innerHTML =
+        (totalSec > 0 ? TAGS.filter(t=>sub[t]>0).map(tag=>{
+            const pct = totalSec>0?(sub[tag]/totalSec)*100:0;
+            return `<div class="flex items-center gap-3">
+                <span class="text-[10px] font-bold ${TAG_CONFIG[tag].text} w-8 text-right shrink-0">${tag}</span>
+                <div class="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div class="h-full ${TAG_CONFIG[tag].bar} rounded-full" style="width:${pct.toFixed(1)}%;"></div>
+                </div>
+                <span class="text-[10px] font-bold text-slate-500 w-12 shrink-0">${fmtHM(sub[tag])}</span>
+            </div>`;
+        }).join('') : '<p class="text-xs font-bold text-slate-300 text-center py-2">この日はまだ記録がありません</p>');
+
+    document.getElementById('detail-task-list').innerHTML =
+        !dayTasks.length
+            ? '<p class="text-xs font-bold text-slate-300 text-center py-4">記録なし</p>'
+            : [...dayTasks].sort((a,b)=>b.elapsedSeconds-a.elapsedSeconds).map(t=>{
+                const cfg = TAG_CONFIG[t.tag]||TAG_CONFIG['その他'];
+                const lapsHtml = (t.laps && t.laps.length)
+                    ? `<div class="mt-2 flex flex-wrap gap-1.5">
+                        ${[...t.laps].reverse().map(lap=>
+                            `<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                ${lap.start}〜${lap.end}
+                                <span class="text-slate-500">(${fmtTime(lap.duration)})</span>
+                            </span>`
+                        ).join('')}
+                       </div>` : '';
+                return `<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2 py-0.5 text-[9px] font-bold rounded-full ${cfg.bg} ${cfg.text} shrink-0">${t.tag}</span>
+                        <span class="flex-1 text-xs font-bold text-slate-700 truncate">${t.name}</span>
+                        <span class="text-xs font-extrabold text-slate-900 shrink-0">${fmtTime(t.elapsedSeconds)}</span>
+                    </div>
+                    ${lapsHtml}
+                </div>`;
+              }).join('');
+
+    panel.classList.remove('hidden');
+    setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+
+/* ── Register all implementations ── */
+_registerImpl('switchPage', (pageId) => {
+    document.querySelectorAll('.page-content').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+pageId).classList.add('active');
+    document.querySelectorAll('.bnav-item').forEach(item=>{
+        item.classList.toggle('active', item.getAttribute('data-tab')===pageId);
+    });
+    if (pageId==='history') loadMonthHistory();
+    if (pageId==='account') { renderSubjectList(); loadMyFeedback(); if(isAdmin) loadAdminFeedback(); syncDarkToggle(); markRepliesRead(); }
+});
+
+_registerImpl('doSignOut', async () => {
+    tasks.forEach(t=>{ if(t.intervalId) clearInterval(t.intervalId); });
+    if (taskUnsub) taskUnsub();
+    await signOut(auth);
+});
+
+_registerImpl('createTask', async () => {
+    const inp = document.getElementById('taskNameInput');
+    const name = inp.value.trim();
+    if (!name) { showToast('内容を入力してください'); return; }
+    const tag = document.getElementById('taskTagInput').value;
+    const duplicate = tasks.find(t => t.name === name && t.tag === tag);
+    if (duplicate) { showToast(`「${name}」は既に存在します`); return; }
+    setSyncState('syncing');
+    await addDoc(tasksCol(todayStr()), {
+        name, tag: document.getElementById('taskTagInput').value,
+        startTime: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+        elapsedSeconds:0, isRunning:false, sessionStartTime:null, preSessionElapsed:0, laps:[],
+        createdAt: Date.now()
+    });
+    inp.value = '';
+    setSyncState('ok');
+});
+
+_registerImpl('toggleTask', async (id) => {
+    const task = tasks.find(t=>t.id===id);
+    if (!task) return;
+    const today = todayStr();
+    if (task.isRunning) {
+        const total = task.preSessionElapsed + (Date.now()-task.sessionStartTime)/1000;
+        clearInterval(task.intervalId); task.intervalId=null;
+        const newLap = {
+            start: new Date(task.sessionStartTime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+            end:   new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+            duration: total - task.preSessionElapsed
+        };
+        setSyncState('syncing');
+        await updateDoc(taskDocRef(today,id), {
+            isRunning:false, elapsedSeconds:total,
+            sessionStartTime:null, preSessionElapsed:0,
+            laps:[newLap,...(task.laps||[])]
+        });
+        setSyncState('ok');
+    } else {
+        setSyncState('syncing');
+        await updateDoc(taskDocRef(today,id), {
+            isRunning:true, preSessionElapsed:task.elapsedSeconds||0, sessionStartTime:Date.now()
+        });
+        setSyncState('ok');
+    }
+});
+
+_registerImpl('resetTask', async (id) => {
+    const task = tasks.find(t=>t.id===id);
+    if (!task) return;
+    if (task.intervalId) clearInterval(task.intervalId);
+    setSyncState('syncing');
+    await updateDoc(taskDocRef(todayStr(),id), {
+        elapsedSeconds:0, isRunning:false, sessionStartTime:null, preSessionElapsed:0, laps:[]
+    });
+    setSyncState('ok');
+});
+
+_registerImpl('deleteTask', async (id) => {
+    const task = tasks.find(t=>t.id===id);
+    if (task?.intervalId) clearInterval(task.intervalId);
+    setSyncState('syncing');
+    await deleteDoc(taskDocRef(todayStr(),id));
+    setSyncState('ok');
+});
+
+let manualMode = 'duration';
+
+function buildManualTimeSelects() {
+    // デフォルトは現在時刻を終了、1時間前を開始に
+    const now = new Date();
+    const endH = now.getHours(), endM = now.getMinutes();
+    let startH = endH - 1;
+    if (startH < 0) startH += 24;
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('manualStartTime').value = `${pad(startH)}:${pad(endM)}`;
+    document.getElementById('manualEndTime').value   = `${pad(endH)}:${pad(endM)}`;
+    updateManualRangePreview();
+}
+
+function updateManualRangePreview() {
+    const preview = document.getElementById('manual-range-preview');
+    if (!preview) return;
+    const sec = getManualRangeSeconds();
+    if (sec === null) { preview.textContent = ''; return; }
+    if (sec <= 0) { preview.textContent = '終了時刻は開始時刻より後にしてください'; return; }
+    preview.textContent = `学習時間: ${fmtTime(sec)}`;
+}
+
+function getManualRangeSeconds() {
+    const startVal = document.getElementById('manualStartTime')?.value;
+    const endVal   = document.getElementById('manualEndTime')?.value;
+    if (!startVal || !endVal) return null;
+    const [sh, sm] = startVal.split(':').map(Number);
+    const [eh, em] = endVal.split(':').map(Number);
+    const startMin = sh*60 + sm;
+    const endMin   = eh*60 + em;
+    return (endMin - startMin) * 60; // 日をまたぐ（終了<開始）場合は負の値を返す
+}
+
+_registerImpl('setManualMode', (mode) => {
+    manualMode = mode;
+    document.getElementById('manual-panel-duration').classList.toggle('hidden', mode !== 'duration');
+    document.getElementById('manual-panel-range').classList.toggle('hidden', mode !== 'range');
+    document.getElementById('manual-mode-duration').className = `flex-1 py-2.5 text-xs font-bold rounded-2xl transition-all ${mode==='duration'?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    document.getElementById('manual-mode-range').className    = `flex-1 py-2.5 text-xs font-bold rounded-2xl transition-all ${mode==='range'?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    if (mode === 'range') updateManualRangePreview();
+});
+
+_registerImpl('addManualTask', async () => {
+    let totalSeconds, startLabel, endLabel;
+    const now = new Date();
+
+    if (manualMode === 'duration') {
+        const h = parseInt(document.getElementById('manualHoursInput').value)   || 0;
+        const m = parseInt(document.getElementById('manualMinutesInput').value) || 0;
+        const s = parseInt(document.getElementById('manualSecondsInput').value) || 0;
+        totalSeconds = h*3600 + m*60 + s;
+        if (totalSeconds <= 0) { showToast('時間を入力してください'); return; }
+        startLabel = '手入力'; endLabel = '完了';
+    } else {
+        totalSeconds = getManualRangeSeconds();
+        if (totalSeconds === null) { showToast('開始・終了時刻を入力してください'); return; }
+        if (totalSeconds <= 0) { showToast('終了時刻は開始時刻より後にしてください'); return; }
+        startLabel = document.getElementById('manualStartTime').value;
+        endLabel   = document.getElementById('manualEndTime').value;
+    }
+
+    const name = document.getElementById('taskNameInput').value.trim();
+    setSyncState('syncing');
+    await addDoc(tasksCol(todayStr()), {
+        name, tag: document.getElementById('taskTagInput').value,
+        startTime: now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+        elapsedSeconds: totalSeconds, isRunning:false, sessionStartTime:null, preSessionElapsed:0,
+        laps:[{start:startLabel, end:endLabel, duration: totalSeconds}],
+        createdAt: Date.now()
+    });
+    closeManualModal();
+    document.getElementById('taskNameInput').value='';
+    document.getElementById('manualHoursInput').value='';
+    document.getElementById('manualMinutesInput').value='';
+    document.getElementById('manualSecondsInput').value='';
+    setSyncState('ok');
+});
+
+_registerImpl('openManualModal', () => {
+    if (!document.getElementById('taskNameInput').value.trim()) { showToast('学習内容を入力してください'); return; }
+    buildManualTimeSelects();
+    setManualMode('duration');
+    document.getElementById('manualModal').classList.remove('hidden');
+});
+_registerImpl('closeManualModal', () => document.getElementById('manualModal').classList.add('hidden'));
+
+_registerImpl('moveMonth', async (delta) => {
+    calMonth += delta;
+    if (calMonth>11){calMonth=0;calYear++;}
+    if (calMonth<0) {calMonth=11;calYear--;}
+    selectedCalDate = null;
+    document.getElementById('detail-panel').classList.add('hidden');
+    await loadMonthHistory();
+});
+
+_registerImpl('closeDetail', () => {
+    selectedCalDate = null;
+    document.getElementById('detail-panel').classList.add('hidden');
+    renderCalendar();
+});
+
+_registerImpl('saveLifeLog', async () => {
+    if (!currentUser) return;
+    const wakeTime   = getTimeFromSelects('lifeWake');
+    const sleepTime  = getTimeFromSelects('lifeSleep');
+    const screenTime = getScreenTimeMinutes('lifeScreenH','lifeScreenM');
+
+    const payload = {};
+    if (wakeTime   !== null) payload.wakeTime   = wakeTime;
+    if (sleepTime  !== null) payload.sleepTime  = sleepTime;
+    if (screenTime !== null && screenTime > 0) payload.screenTime = screenTime;
+
+    if (!Object.keys(payload).length) { showToast('入力してから保存してください'); return; }
+
+    try {
+        lifeFormDirty = false;
+        setSyncState('syncing');
+        await setDoc(doc(db,'users',currentUser.uid,'days',todayStr()), payload, { merge: true });
+        historyLifeCache[todayStr()] = { ...(historyLifeCache[todayStr()]||{}), ...payload };
+        setSyncState('ok');
+        showToast('生活ログを保存しました');
+    } catch(e) {
+        console.error('saveLifeLog error', e);
+        lifeFormDirty = false;
+        setSyncState('err');
+        showToast('保存に失敗しました');
+    }
+});
+
+/* ── 過去の生活ログ編集 ── */
+let lifeEditTargetDate = null;
+
+function buildLifeEditSelects() {
+    ['lifeEditWakeH','lifeEditSleepH'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerHTML = '<option value="">--</option>' +
+            Array.from({length:24},(_,i)=>i).map(h=>`<option value="${String(h).padStart(2,'0')}">${String(h).padStart(2,'0')}</option>`).join('');
+    });
+    ['lifeEditWakeM','lifeEditSleepM'].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerHTML = '<option value="">--</option>' +
+            Array.from({length:60},(_,i)=>i).map(m=>`<option value="${String(m).padStart(2,'0')}">${String(m).padStart(2,'0')}</option>`).join('');
+    });
+    buildScreenTimeSelects('lifeEditScreenH','lifeEditScreenM');
+}
+
+_registerImpl('openLifeEditModal', async () => {
+    if (!selectedCalDate) return;
+    lifeEditTargetDate = selectedCalDate;
+    buildLifeEditSelects();
+    document.getElementById('life-edit-err').textContent = '';
+    const [y,m,d] = selectedCalDate.split('-').map(Number);
+    const label = new Date(y,m-1,d).toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'});
+    document.getElementById('life-edit-date-label').textContent = label;
+
+    // 既存データを読み込む（編集時は常に最新を取得する）
+    let lifeData = {};
+    try {
+        const snap = await getDocFromServer(doc(db,'users',currentUser.uid,'days',selectedCalDate));
+        lifeData = snap.exists() ? snap.data() : {};
+        historyLifeCache[selectedCalDate] = lifeData;
+    } catch(e) {
+        // オフライン等でサーバー取得できない場合はキャッシュを使う
+        lifeData = historyLifeCache[selectedCalDate] || {};
+    }
+
+    const setSelect = (hId, mId, timeStr) => {
+        const [h,m] = (timeStr||'').split(':');
+        const hEl = document.getElementById(hId); const mEl = document.getElementById(mId);
+        if (hEl) hEl.value = h||''; if (mEl) mEl.value = m||'';
+    };
+    setSelect('lifeEditWakeH','lifeEditWakeM', lifeData.wakeTime||'');
+    setSelect('lifeEditSleepH','lifeEditSleepM', lifeData.sleepTime||'');
+    setScreenTimeSelects('lifeEditScreenH','lifeEditScreenM', lifeData.screenTime);
+
+    document.getElementById('lifeEditModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+});
+
+_registerImpl('closeLifeEditModal', () => {
+    document.getElementById('lifeEditModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    lifeEditTargetDate = null;
+});
+
+_registerImpl('saveLifeEditModal', async () => {
+    if (!lifeEditTargetDate || !currentUser) return;
+    const errEl = document.getElementById('life-edit-err');
+    const btn   = document.getElementById('life-edit-save-btn');
+    errEl.textContent = '';
+
+    const getTime = (hId, mId) => {
+        const h = document.getElementById(hId)?.value;
+        const m = document.getElementById(mId)?.value;
+        return (h && m) ? `${h}:${m}` : null;
+    };
+    const wakeTime   = getTime('lifeEditWakeH','lifeEditWakeM');
+    const sleepTime  = getTime('lifeEditSleepH','lifeEditSleepM');
+    const screenTime = getScreenTimeMinutes('lifeEditScreenH','lifeEditScreenM');
+
+    const payload = {};
+    if (wakeTime)  payload.wakeTime  = wakeTime;
+    if (sleepTime) payload.sleepTime = sleepTime;
+    if (screenTime !== null && screenTime > 0) payload.screenTime = screenTime;
+
+    if (!Object.keys(payload).length) { errEl.textContent = '入力してから保存してください'; return; }
+
+    btn.disabled = true;
+    try {
+        setSyncState('syncing');
+        await setDoc(doc(db,'users',currentUser.uid,'days',lifeEditTargetDate), payload, { merge: true });
+        historyLifeCache[lifeEditTargetDate] = { ...(historyLifeCache[lifeEditTargetDate]||{}), ...payload };
+        setSyncState('ok');
+        // 詳細パネルの生活記録を更新
+        showDayDetail(lifeEditTargetDate);
+        document.getElementById('lifeEditModal').classList.add('hidden');
+        document.body.style.overflow = '';
+        showToast('保存しました');
+    } catch(e) {
+        console.error('saveLifeEditModal error', e);
+        setSyncState('err');
+        errEl.textContent = '保存に失敗しました';
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+_registerImpl('saveNickname', async () => {
+    if (!currentUser) return;
+    const nickname = document.getElementById('nicknameInput').value.trim();
+    if (!nickname) { showToast('ニックネームを入力してください'); return; }
+    try {
+        setSyncState('syncing');
+        await setDoc(doc(db,'users',currentUser.uid), { nickname }, { merge: true });
+        setSyncState('ok');
+        // UIリフレッシュ
+        document.getElementById('account-display-name').textContent = nickname;
+        document.getElementById('account-avatar').textContent = nickname[0].toUpperCase();
+        document.getElementById('user-badge').textContent = nickname;
+        showToast('ニックネームを保存しました');
+    } catch(e) {
+        console.error('saveNickname error', e);
+        setSyncState('err');
+        showToast('保存に失敗しました');
+    }
+});
+
+/* ── Custom Subjects ── */
+async function loadCustomSubjects() {
+    if (!currentUser) return;
+    try {
+        const snap = await getDoc(doc(db,'users',currentUser.uid));
+        const data = snap.exists() ? snap.data() : {};
+        const customs = data.customSubjects || [];
+        customs.forEach((name, i) => {
+            if (!TAG_CONFIG[name]) {
+                TAG_CONFIG[name] = CUSTOM_COLORS[i % CUSTOM_COLORS.length];
+            }
+        });
+        TAGS = Object.keys(TAG_CONFIG);
+    } catch(e) { console.error('loadCustomSubjects', e); }
+}
+
+function renderSubjectList() {
+    const el = document.getElementById('subject-list'); if (!el) return;
+    el.innerHTML = TAGS.map(tag => {
+        const cfg = TAG_CONFIG[tag];
+        const isDefault = DEFAULT_TAGS.includes(tag);
+        return `<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${isDefault?'border-slate-100 bg-slate-50':'border-slate-200 bg-white'}">
+            <div class="w-2 h-2 rounded-full shrink-0" style="background:${cfg.hex}"></div>
+            <span class="text-xs font-bold text-slate-700">${tag}</span>
+            ${!isDefault ? `<button onclick="removeSubject('${tag}')" class="text-slate-300 hover:text-red-400 transition-all ml-0.5 text-xs font-bold leading-none">x</button>` : ''}
+        </div>`;
+    }).join('');
+    // タスク追加セレクトを更新
+    const sel = document.getElementById('taskTagInput');
+    if (sel) {
+        const cur = sel.value;
+        sel.innerHTML = TAGS.map(t=>`<option value="${t}"${t===cur?' selected':''}>${t}</option>`).join('');
+    }
+}
+
+_registerImpl('addSubject', async () => {
+    const inp = document.getElementById('newSubjectInput');
+    const name = inp.value.trim();
+    if (!name) { showToast('科目名を入力してください'); return; }
+    if (TAG_CONFIG[name]) { showToast('その科目は既に存在します'); return; }
+    if (Object.keys(TAG_CONFIG).length >= 14) { showToast('科目は最大14個までです'); return; }
+    const customIdx = TAGS.length - DEFAULT_TAGS.length;
+    TAG_CONFIG[name] = CUSTOM_COLORS[customIdx % CUSTOM_COLORS.length];
+    TAGS = Object.keys(TAG_CONFIG);
+    const customs = TAGS.filter(t => !DEFAULT_TAGS.includes(t));
+    try {
+        await setDoc(doc(db,'users',currentUser.uid), { customSubjects: customs }, { merge: true });
+        inp.value = '';
+        renderSubjectList();
+        renderSummary();
+        buildFilterBar();
+        showToast(`「${name}」を追加しました`);
+    } catch(e) {
+        delete TAG_CONFIG[name];
+        TAGS = Object.keys(TAG_CONFIG);
+        showToast('保存に失敗しました');
+    }
+});
+
+_registerImpl('removeSubject', async (name) => {
+    if (DEFAULT_TAGS.includes(name)) return;
+    delete TAG_CONFIG[name];
+    TAGS = Object.keys(TAG_CONFIG);
+    const customs = TAGS.filter(t => !DEFAULT_TAGS.includes(t));
+    try {
+        await setDoc(doc(db,'users',currentUser.uid), { customSubjects: customs }, { merge: true });
+        renderSubjectList();
+        renderSummary();
+        buildFilterBar();
+        showToast(`「${name}」を削除しました`);
+    } catch(e) {
+        showToast('削除に失敗しました');
+    }
+});
+
+/* ── Feedback ── */
+_registerImpl('sendFeedback', async () => {
+    const text = document.getElementById('feedbackText').value.trim();
+    if (!text) { showToast('内容を入力してください'); return; }
+    try {
+        await addDoc(collection(db, 'feedback'), {
+            text,
+            email: currentUser?.email || '不明',
+            nickname: document.getElementById('nicknameInput')?.value || '',
+            uid: currentUser?.uid || '',
+            createdAt: Date.now(),
+            read: false
+        });
+        document.getElementById('feedbackText').value = '';
+        showToast('送信しました！ありがとうございます');
+        loadMyFeedback();
+    } catch(e) {
+        console.error('sendFeedback error', e);
+        showToast('送信に失敗しました');
+    }
+});
+
+let myFeedbackUnsub = null;
+
+function loadMyFeedback() {
+    if (!currentUser) return;
+    const list = document.getElementById('my-feedback-list');
+    if (!list) return;
+    if (myFeedbackUnsub) myFeedbackUnsub();
+    myFeedbackUnsub = onSnapshot(
+        query(collection(db, 'feedback'), where('uid', '==', currentUser.uid)),
+        snap => {
+            if (snap.empty) { list.innerHTML = ''; return; }
+            const docs = snap.docs.slice().sort((a,b) => (b.data().createdAt||0) - (a.data().createdAt||0));
+            list.innerHTML = `<div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2 mt-2">送信履歴</div>` +
+            docs.map(fdoc => {
+                const data = fdoc.data();
+                const date = new Date(data.createdAt);
+                const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+                const hasReply = !!data.reply;
+                return `<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-slate-300">${dateStr}</span>
+                        ${hasReply ? '<span class="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-green-50 text-green-600">返信あり</span>' : '<span class="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-slate-100 text-slate-400">未返信</span>'}
+                    </div>
+                    <p class="text-xs font-bold text-slate-600 leading-relaxed whitespace-pre-wrap">${data.text.replace(/</g,'&lt;')}</p>
+                    ${hasReply ? `<div class="mt-2 pl-3 border-l-2 border-green-200">
+                        <div class="text-[9px] font-extrabold text-green-500 uppercase tracking-widest mb-1">運営より</div>
+                        <p class="text-xs font-bold text-slate-700 leading-relaxed whitespace-pre-wrap">${data.reply.replace(/</g,'&lt;')}</p>
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+        },
+        err => {
+            console.error('loadMyFeedback error', err);
+            list.innerHTML = `<div class="text-[10px] font-bold text-red-400 text-center py-2">送信履歴の読み込みに失敗しました（${err.code}）</div>`;
+        }
+    );
+}
+
+let feedbackCache = {}; // id -> data（返信モーダルで参照）
+
+async function loadAdminFeedback() {
+    if (!isAdmin) return;
+    const list = document.getElementById('admin-feedback-list');
+    const countEl = document.getElementById('admin-feedback-count');
+    if (!list) return;
+    list.innerHTML = '<p class="text-xs font-bold text-slate-300 text-center py-4">読み込み中...</p>';
+    try {
+        const snap = await getDocs(query(collection(db, 'feedback'), orderBy('createdAt', 'desc')));
+        if (countEl) countEl.textContent = `${snap.size}件`;
+        if (snap.empty) {
+            list.innerHTML = '<p class="text-xs font-bold text-slate-300 text-center py-4">まだ意見がありません</p>';
+            return;
+        }
+        feedbackCache = {};
+        list.innerHTML = snap.docs.map(fdoc => {
+            const data = fdoc.data();
+            feedbackCache[fdoc.id] = data;
+            const date = new Date(data.createdAt);
+            const dateStr = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+            const sender = data.nickname || data.email || '不明';
+            const unread = !data.read;
+            const hasReply = !!data.reply;
+            const replyHtml = hasReply ? `
+                <div class="mt-2 pl-3 border-l-2 border-slate-200">
+                    <div class="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">返信済み</div>
+                    <p class="text-xs font-bold text-slate-500 leading-relaxed whitespace-pre-wrap">${data.reply.replace(/</g,'&lt;')}</p>
+                </div>` : '';
+            return `<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 ${unread?'border-blue-100 bg-blue-50/30':'opacity-80'}">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-slate-500">${sender}</span>
+                        ${unread ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>' : ''}
+                        ${hasReply ? '<span class="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-green-50 text-green-600">返信済み</span>' : ''}
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-300">${dateStr}</span>
+                </div>
+                <p class="text-xs font-bold text-slate-700 leading-relaxed whitespace-pre-wrap">${data.text.replace(/</g,'&lt;')}</p>
+                ${replyHtml}
+                <div class="flex gap-2 mt-3">
+                    <button onclick="openReplyModal('${fdoc.id}')" class="flex-1 py-2 text-[10px] font-bold rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-all">${hasReply ? '返信を編集' : '返信する'}</button>
+                    <button onclick="deleteFeedback('${fdoc.id}')" class="px-4 py-2 text-[10px] font-bold rounded-xl bg-white border border-red-100 text-red-400 hover:bg-red-50 transition-all">削除</button>
+                </div>
+            </div>`;
+        }).join('');
+        // 未読を既読にマーク
+        snap.docs.filter(fdoc => !fdoc.data().read).forEach(async fdoc => {
+            try { await updateDoc(doc(db,'feedback',fdoc.id), { read: true }); } catch(e) {}
+        });
+    } catch(e) {
+        console.error('loadAdminFeedback error', e);
+        list.innerHTML = '<p class="text-xs font-bold text-red-300 text-center py-4">読み込みに失敗しました</p>';
+    }
+}
+
+/* ── Feedback Reply / Delete ── */
+let currentReplyId = null;
+
+_registerImpl('openReplyModal', (id) => {
+    currentReplyId = id;
+    const data = feedbackCache[id];
+    if (!data) return;
+    const sender = data.nickname || data.email || '不明';
+    document.getElementById('reply-target').textContent = `宛先: ${sender}`;
+    document.getElementById('reply-original-text').textContent = data.text;
+    document.getElementById('replyText').value = data.reply || '';
+    document.getElementById('reply-err').textContent = '';
+    document.getElementById('replyModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+});
+
+_registerImpl('closeReplyModal', () => {
+    document.getElementById('replyModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    currentReplyId = null;
+});
+
+_registerImpl('sendReply', async () => {
+    if (!currentReplyId) return;
+    const text = document.getElementById('replyText').value.trim();
+    const errEl = document.getElementById('reply-err');
+    const btn = document.getElementById('reply-send-btn');
+    if (!text) { errEl.textContent = '返信内容を入力してください'; return; }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,0.3);"></span>';
+    try {
+        await updateDoc(doc(db, 'feedback', currentReplyId), {
+            reply: text,
+            repliedAt: Date.now()
+        });
+        document.getElementById('replyModal').classList.add('hidden');
+        document.body.style.overflow = '';
+        currentReplyId = null;
+        showToast('返信を送信しました');
+        loadAdminFeedback();
+    } catch(e) {
+        console.error('sendReply error', e);
+        errEl.textContent = '送信に失敗しました';
+        btn.disabled = false;
+        btn.innerHTML = '送信する';
+    }
+});
+
+_registerImpl('deleteFeedback', async (id) => {
+    if (!confirm('この意見を削除しますか？')) return;
+    try {
+        await deleteDoc(doc(db, 'feedback', id));
+        showToast('削除しました');
+        loadAdminFeedback();
+    } catch(e) {
+        console.error('deleteFeedback error', e);
+        showToast('削除に失敗しました');
+    }
+});
+
+/* ── Study Time Graph ── */
+let studyChartInstance = null;
+let currentStudyGraphRange = 'week';
+
+_registerImpl('setStudyGraphRange', (range) => {
+    currentStudyGraphRange = range;
+    document.getElementById('study-graph-btn-week').className  = `flex-1 py-2 text-xs font-bold rounded-xl transition-all ${range==='week'  ?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    document.getElementById('study-graph-btn-month').className = `flex-1 py-2 text-xs font-bold rounded-xl transition-all ${range==='month' ?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    loadStudyGraph(range);
+});
+
+async function loadStudyGraph(range) {
+    if (!currentUser) return;
+    const today = new Date();
+    const days = range === 'week' ? 7 : 30;
+    const labels = [];
+    const dateStrs = [];
+
+    for (let i = days-1; i >= 0; i--) {
+        const d = new Date(today); d.setDate(today.getDate() - i);
+        dateStrs.push(fmtDate(d));
+        labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+    }
+
+    // 各日のタスクを取得（todayStr()のキャッシュがあれば使う）
+    const perDaySubjectTotals = []; // [{subject: seconds, ...}, ...]
+    const promises = dateStrs.map((ds, idx) => {
+        if (ds === todayStr()) {
+            const sub = {};
+            TAGS.forEach(t => sub[t] = 0);
+            tasks.forEach(t => { if (sub[t.tag] !== undefined) sub[t.tag] += t.elapsedSeconds; });
+            perDaySubjectTotals[idx] = sub;
+            return Promise.resolve();
+        }
+        return getDocs(collection(db,'users',currentUser.uid,'days',ds,'tasks'))
+            .then(snap => {
+                const sub = {};
+                TAGS.forEach(t => sub[t] = 0);
+                snap.docs.forEach(d => {
+                    const data = d.data();
+                    if (sub[data.tag] !== undefined) sub[data.tag] += data.elapsedSeconds;
+                    else sub[data.tag] = (sub[data.tag]||0) + data.elapsedSeconds; // カスタム科目（削除済みでも表示）
+                });
+                perDaySubjectTotals[idx] = sub;
+            })
+            .catch(() => { perDaySubjectTotals[idx] = {}; });
+    });
+    await Promise.all(promises);
+
+    // 出現した全科目を集計
+    const allSubjects = new Set(TAGS);
+    perDaySubjectTotals.forEach(sub => Object.keys(sub).forEach(k => allSubjects.add(k)));
+
+    // データセット作成（分単位）
+    const datasets = Array.from(allSubjects).filter(tag => {
+        // 全期間で0なら非表示
+        return perDaySubjectTotals.some(sub => (sub[tag]||0) > 0);
+    }).map(tag => {
+        const cfg = TAG_CONFIG[tag] || TAG_CONFIG['その他'];
+        return {
+            label: tag,
+            data: perDaySubjectTotals.map(sub => Math.round(((sub[tag]||0) / 60) * 10) / 10),
+            backgroundColor: cfg.hex,
+            borderRadius: 4,
+        };
+    });
+
+    drawStudyChart(labels, datasets);
+}
+
+function drawStudyChart(labels, datasets) {
+    const canvas = document.getElementById('studyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (studyChartInstance) { studyChartInstance.destroy(); studyChartInstance = null; }
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const tickColor = isDark ? '#64748b' : '#94a3b8';
+    const gridColor = isDark ? '#1e293b' : '#f1f5f9';
+
+    const draw = () => {
+        studyChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: isDark ? '#334155' : '#0f172a',
+                        titleColor: isDark ? '#f1f5f9' : '#ffffff',
+                        bodyColor:  isDark ? '#cbd5e1' : '#e2e8f0',
+                        callbacks: {
+                            label: (ctx) => {
+                                const mins = ctx.parsed.y;
+                                if (!mins) return null;
+                                const h = Math.floor(mins/60), m = Math.round(mins%60);
+                                const label = ctx.dataset.label;
+                                return ` ${label}: ${h>0?h+'h ':''}${m}m`;
+                            },
+                            afterBody: (items) => {
+                                if (!items.length) return '';
+                                const total = items.reduce((sum, item) => sum + item.parsed.y, 0);
+                                const h = Math.floor(total/60), m = Math.round(total%60);
+                                return `合計: ${h>0?h+'h ':''}${m}m`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxRotation: 0 }, grid: { display: false }, border: { color: gridColor } },
+                    y: {
+                        stacked: true, beginAtZero: true,
+                        afterBuildTicks: (axis) => {
+                            const maxVal = axis.max;
+                            let step;
+                            if (maxVal <= 60) step = 15;
+                            else if (maxVal <= 180) step = 30;
+                            else if (maxVal <= 360) step = 60;
+                            else if (maxVal <= 720) step = 120;
+                            else step = 180;
+                            const niceMax = Math.ceil(maxVal / step) * step;
+                            axis.max = niceMax;
+                            const ticks = [];
+                            for (let v = 0; v <= niceMax; v += step) ticks.push({ value: v });
+                            axis.ticks = ticks;
+                        },
+                        ticks: {
+                            font: { size: 9, weight: '700' }, color: tickColor,
+                            callback: v => {
+                                if (v === 0) return '0m';
+                                if (v % 60 === 0) return (v/60) + 'h';
+                                return v + 'm';
+                            }
+                        },
+                        grid: { color: gridColor },
+                        border: { color: gridColor }
+                    }
+                }
+            }
+        });
+
+        // 凡例を手動描画
+        const legendEl = document.getElementById('study-chart-legend');
+        if (legendEl) {
+            legendEl.innerHTML = datasets.map(ds => `
+                <div class="flex items-center gap-1.5">
+                    <div class="w-3 h-3 rounded-full" style="background:${ds.backgroundColor}"></div>
+                    <span class="text-[10px] font-bold text-slate-400">${ds.label}</span>
+                </div>`).join('') || '<p class="text-[10px] font-bold text-slate-300">データがありません</p>';
+        }
+    };
+
+    if (window.Chart) {
+        draw();
+    } else {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        s.onload = draw;
+        document.head.appendChild(s);
+    }
+}
+
+/* ── Sleep Graph ── */
+let sleepChartInstance = null;
+let currentGraphRange = 'week';
+
+_registerImpl('setGraphRange', (range) => {
+    currentGraphRange = range;
+    document.getElementById('graph-btn-week').className  = `flex-1 py-2 text-xs font-bold rounded-xl transition-all ${range==='week'  ?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    document.getElementById('graph-btn-month').className = `flex-1 py-2 text-xs font-bold rounded-xl transition-all ${range==='month' ?'bg-slate-900 text-white':'bg-slate-100 text-slate-500'}`;
+    loadSleepGraph(range);
+});
+
+async function loadSleepGraph(range) {
+    if (!currentUser) return;
+    const today = new Date();
+    const days = range === 'week' ? 7 : 30;
+    const labels = [], wakeData = [], sleepData = [];
+
+    const promises = [];
+    for (let i = days-1; i >= 0; i--) {
+        const d = new Date(today); d.setDate(today.getDate() - i);
+        const ds = fmtDate(d);
+        labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+        promises.push(
+            getDoc(doc(db,'users',currentUser.uid,'days',ds))
+                .then(snap => {
+                    const data = snap.exists() ? snap.data() : {};
+                    wakeData.push(timeToFloat(data.wakeTime));
+                    sleepData.push(timeToFloat(data.sleepTime, true));
+                })
+                .catch(() => { wakeData.push(null); sleepData.push(null); })
+        );
+    }
+    await Promise.all(promises);
+    drawSleepChart(labels, wakeData, sleepData);
+}
+
+function timeToFloat(timeStr, isSleep=false) {
+    if (!timeStr) return null;
+    const [h, m] = timeStr.split(':').map(Number);
+    let val = h + m/60;
+    // 就寝時間が0〜6時の場合は24+時間として扱う（翌日扱い）
+    if (isSleep && val < 6) val += 24;
+    return Math.round(val * 10) / 10;
+}
+
+function drawSleepChart(labels, wakeData, sleepData) {
+    const canvas = document.getElementById('sleepChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (sleepChartInstance) { sleepChartInstance.destroy(); sleepChartInstance = null; }
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const tickColor  = isDark ? '#64748b' : '#94a3b8';
+    const gridColor  = isDark ? '#1e293b' : '#f1f5f9';
+    const canvasBg   = isDark ? '#1e293b' : '#ffffff';
+
+    const draw = () => {
+        sleepChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: '起床',
+                        data: wakeData,
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96,165,250,0.15)',
+                        pointBackgroundColor: '#60a5fa',
+                        pointBorderColor: canvasBg,
+                        pointBorderWidth: 2,
+                        pointRadius: 4, pointHoverRadius: 6,
+                        tension: 0.3, spanGaps: true, fill: false,
+                        borderWidth: 2.5,
+                    },
+                    {
+                        label: '就寝',
+                        data: sleepData,
+                        borderColor: '#a78bfa',
+                        backgroundColor: 'rgba(167,139,250,0.15)',
+                        pointBackgroundColor: '#a78bfa',
+                        pointBorderColor: canvasBg,
+                        pointBorderWidth: 2,
+                        pointRadius: 4, pointHoverRadius: 6,
+                        tension: 0.3, spanGaps: true, fill: false,
+                        borderWidth: 2.5,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? '#334155' : '#0f172a',
+                        titleColor: isDark ? '#f1f5f9' : '#ffffff',
+                        bodyColor:  isDark ? '#cbd5e1' : '#e2e8f0',
+                        callbacks: { label: (ctx) => {
+                            const v = ctx.parsed.y;
+                            if (v == null) return '未記録';
+                            const h = Math.floor(v % 24);
+                            const m = Math.round((v % 1) * 60);
+                            return ` ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                        }}
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0, max: 30,
+                        ticks: {
+                            stepSize: 3,
+                            font: { size: 9, weight: '700' },
+                            color: tickColor,
+                            callback: v => {
+                                const h = v % 24;
+                                return `${String(h).padStart(2,'0')}:00`;
+                            }
+                        },
+                        grid: { color: gridColor },
+                        border: { color: gridColor }
+                    },
+                    x: {
+                        ticks: { font: { size: 9, weight: '700' }, color: tickColor, maxRotation: 0 },
+                        grid: { display: false },
+                        border: { color: gridColor }
+                    }
+                }
+            }
+        });
+    };
+
+    if (window.Chart) {
+        draw();
+    } else {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        s.onload = draw;
+        document.head.appendChild(s);
+    }
+}
+
+_registerImpl('openDeleteAccount', () => {
+    document.getElementById('delete-pass-input').value = '';
+    document.getElementById('delete-err').textContent = '';
+    document.getElementById('deleteAccountModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('delete-pass-input').focus(), 100);
+});
+
+_registerImpl('closeDeleteAccount', () => {
+    document.getElementById('deleteAccountModal').classList.add('hidden');
+    document.body.style.overflow = '';
+});
+
+_registerImpl('doDeleteAccount', async () => {
+    const pass = document.getElementById('delete-pass-input').value;
+    const errEl = document.getElementById('delete-err');
+    const btn = document.getElementById('delete-confirm-btn');
+    errEl.textContent = '';
+    if (!pass) { errEl.textContent = 'パスワードを入力してください'; return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,0.3);"></span>';
+
+    try {
+        // 再認証
+        const credential = EmailAuthProvider.credential(currentUser.email, pass);
+        await reauthenticateWithCredential(currentUser, credential);
+
+        // Firestoreのユーザーデータを削除
+        const userDaysRef = collection(db, 'users', currentUser.uid, 'days');
+        const daysSnap = await getDocs(userDaysRef);
+        const deletePromises = [];
+        for (const dayDoc of daysSnap.docs) {
+            const tasksSnap = await getDocs(collection(db, 'users', currentUser.uid, 'days', dayDoc.id, 'tasks'));
+            tasksSnap.docs.forEach(t => deletePromises.push(deleteDoc(doc(db, 'users', currentUser.uid, 'days', dayDoc.id, 'tasks', t.id))));
+            deletePromises.push(deleteDoc(doc(db, 'users', currentUser.uid, 'days', dayDoc.id)));
+        }
+        deletePromises.push(deleteDoc(doc(db, 'users', currentUser.uid)));
+        await Promise.all(deletePromises);
+
+        // Authアカウント削除
+        await deleteUser(currentUser);
+        location.href = '../index.html';
+    } catch(e) {
+        console.error('deleteAccount error', e);
+        const msgs = {
+            'auth/wrong-password':     'パスワードが正しくありません',
+            'auth/too-many-requests':  'しばらく時間をおいてから再試行してください',
+            'auth/requires-recent-login': 'セキュリティのため再ログインが必要です',
+        };
+        errEl.textContent = msgs[e.code] || 'エラーが発生しました';
+        btn.disabled = false;
+        btn.innerHTML = '削除する';
+    }
+});
+
+/* ── Dark Mode ── */
+function applyDarkMode(dark) {
+    const html = document.documentElement;
+    if (dark) html.classList.add('dark');
+    else      html.classList.remove('dark');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = dark ? '#0f172a' : '#f8fafc';
+}
+
+function syncDarkToggle() {
+    const pref   = localStorage.getItem('darkPref') || 'system';
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark  = pref === 'dark' || (pref === 'system' && sysDark);
+    applyDarkMode(isDark);
+
+    // ボタンUIを更新
+    const labels  = { system:'システムに従う', light:'ライトモード', dark:'ダークモード' };
+    const labelEl = document.getElementById('dark-label');
+    if (labelEl) labelEl.textContent = labels[pref] || labels.system;
+
+    ['system','light','dark'].forEach(p => {
+        const btn = document.getElementById('dark-btn-' + p);
+        if (!btn) return;
+        const active = p === pref;
+        btn.className = `flex-1 py-2.5 text-xs font-bold rounded-2xl border-2 transition-all active:scale-95 ${
+            active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-100'
+        }`;
+    });
+}
+
+_registerImpl('setDarkPref', async (pref) => {
+    localStorage.setItem('darkPref', pref);
+    syncDarkToggle();
+    // Firestoreに保存（キャッシュを消しても復元できるように）
+    if (currentUser) {
+        try {
+            await setDoc(doc(db,'users',currentUser.uid), { darkPref: pref }, { merge: true });
+        } catch(e) {
+            console.error('setDarkPref save error', e);
+        }
+    }
+    // インサイトモーダルのグラフが開いていれば再描画
+    if (!document.getElementById('insightModal').classList.contains('hidden')) {
+        if (studyChartInstance) loadStudyGraph(currentStudyGraphRange);
+        if (sleepChartInstance) loadSleepGraph(currentGraphRange);
+    }
+});
+
+// OSのダークモード変更をリアルタイム検知
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const pref = localStorage.getItem('darkPref') || 'system';
+    if (pref === 'system') {
+        syncDarkToggle();
+        if (!document.getElementById('insightModal').classList.contains('hidden')) {
+            if (studyChartInstance) loadStudyGraph(currentStudyGraphRange);
+            if (sleepChartInstance) loadSleepGraph(currentGraphRange);
+        }
+    }
+});
+
+/* ── Notification Badge ── */
+let notifUnsub = null;
+
+function startNotifWatch() {
+    if (!currentUser || isAdmin) return;
+    if (notifUnsub) notifUnsub();
+    notifUnsub = onSnapshot(
+        query(collection(db, 'feedback'), where('uid', '==', currentUser.uid)),
+        snap => {
+            const hasUnread = snap.docs.some(d => d.data().reply && !d.data().replyRead);
+            const badge = document.getElementById('account-badge');
+            if (badge) badge.classList.toggle('show', hasUnread);
+        },
+        err => console.error('notifWatch error', err)
+    );
+}
+
+// 返信を読んだときに replyRead をセット（アカウントページに切り替えたとき）
+async function markRepliesRead() {
+    if (!currentUser || isAdmin) return;
+    try {
+        const snap = await getDocs(query(collection(db,'feedback'), where('uid','==',currentUser.uid)));
+        snap.docs.filter(d => d.data().reply && !d.data().replyRead).forEach(async d => {
+            try { await updateDoc(doc(db,'feedback',d.id), { replyRead: true }); } catch(e) {}
+        });
+        // バッジを消す
+        const badge = document.getElementById('account-badge');
+        if (badge) badge.classList.remove('show');
+    } catch(e) {}
+}
+
+/* ── Insights (sleep / screen time / weekly summary) ── */
+_registerImpl('openInsight', async (type) => {
+    document.getElementById('insightModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    const titleEl = document.getElementById('insight-title');
+    const bodyEl  = document.getElementById('insight-body');
+    bodyEl.innerHTML = '<p class="text-xs font-bold text-slate-300 text-center py-8">読み込み中...</p>';
+
+    if (type === 'study')  { titleEl.textContent = '勉強時間グラフ'; await renderStudyInsight(bodyEl); }
+    if (type === 'rhythm') { titleEl.textContent = '睡眠リズムグラフ'; await renderRhythmInsight(bodyEl); }
+    if (type === 'sleep')  { titleEl.textContent = '睡眠時間レポート'; await renderSleepInsight(bodyEl); }
+    if (type === 'screen') { titleEl.textContent = 'スクリーンタイムグラフ'; await renderScreenInsight(bodyEl); }
+    if (type === 'weekly') { titleEl.textContent = '週間サマリー'; await renderWeeklyInsight(bodyEl); }
+});
+
+_registerImpl('closeInsight', () => {
+    document.getElementById('insightModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    if (insightChartInstance) { insightChartInstance.destroy(); insightChartInstance = null; }
+    if (studyChartInstance)   { studyChartInstance.destroy();   studyChartInstance = null; }
+    if (sleepChartInstance)   { sleepChartInstance.destroy();   sleepChartInstance = null; }
+});
+
+let insightChartInstance = null;
+
+async function fetchDayRange(days) {
+    const today = new Date();
+    const dateStrs = [];
+    for (let i = days-1; i >= 0; i--) {
+        const d = new Date(today); d.setDate(today.getDate() - i);
+        dateStrs.push(fmtDate(d));
+    }
+    const results = {};
+    await Promise.all(dateStrs.map(ds =>
+        getDocFromServer(doc(db,'users',currentUser.uid,'days',ds))
+            .then(snap => { results[ds] = snap.exists() ? snap.data() : {}; })
+            .catch(() =>
+                // サーバー取得に失敗した場合（オフライン等）はキャッシュにフォールバック
+                getDoc(doc(db,'users',currentUser.uid,'days',ds))
+                    .then(snap => { results[ds] = snap.exists() ? snap.data() : {}; })
+                    .catch(() => { results[ds] = {}; })
+            )
+    ));
+    return { dateStrs, results };
+}
+
+function sleepDurationHours(wakeTime, sleepTime) {
+    // sleepTime（前日就寝）→wakeTime（当日起床）の睡眠時間を計算
+    if (!wakeTime || !sleepTime) return null;
+    const [wh, wm] = wakeTime.split(':').map(Number);
+    const [sh, sm] = sleepTime.split(':').map(Number);
+    let wakeMin  = wh*60 + wm;
+    let sleepMin = sh*60 + sm;
+    // 就寝が0〜6時台なら日付的に当日扱いなので24h加算しない。それ以外（夜の時間）は前日扱い
+    let diff;
+    if (sleepMin >= wakeMin) {
+        // 就寝時刻が起床時刻より後（通常の夜更かしパターン）→ 翌朝まで
+        diff = (24*60 - sleepMin) + wakeMin;
+    } else {
+        diff = wakeMin - sleepMin;
+    }
+    return Math.round((diff/60) * 10) / 10;
+}
+
+async function renderStudyInsight(bodyEl) {
+    bodyEl.innerHTML = `
+        <div class="flex gap-2 mb-4">
+            <button onclick="setStudyGraphRange('week')" id="study-graph-btn-week" class="flex-1 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white transition-all">週</button>
+            <button onclick="setStudyGraphRange('month')" id="study-graph-btn-month" class="flex-1 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 transition-all">月</button>
+        </div>
+        <canvas id="studyChart" height="180" class="w-full"></canvas>
+        <div id="study-chart-legend" class="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3"></div>
+    `;
+    await loadStudyGraph(currentStudyGraphRange);
+}
+
+async function renderRhythmInsight(bodyEl) {
+    bodyEl.innerHTML = `
+        <div class="flex gap-2 mb-4">
+            <button onclick="setGraphRange('week')" id="graph-btn-week" class="flex-1 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white transition-all">週</button>
+            <button onclick="setGraphRange('month')" id="graph-btn-month" class="flex-1 py-2 text-xs font-bold rounded-xl bg-slate-100 text-slate-500 transition-all">月</button>
+        </div>
+        <canvas id="sleepChart" height="180" class="w-full"></canvas>
+        <div class="flex justify-center gap-6 mt-3">
+            <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-full bg-blue-400"></div><span class="text-[10px] font-bold text-slate-400">起床</span></div>
+            <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-full bg-purple-400"></div><span class="text-[10px] font-bold text-slate-400">就寝</span></div>
+        </div>
+    `;
+    await loadSleepGraph(currentGraphRange);
+}
+
+async function renderSleepInsight(bodyEl) {
+    const { dateStrs, results } = await fetchDayRange(14);
+    const sleepHours = [];
+    for (let i = 1; i < dateStrs.length; i++) {
+        const wake  = results[dateStrs[i]]?.wakeTime;
+        const sleep = results[dateStrs[i-1]]?.sleepTime; // 前日の就寝時刻
+        const h = sleepDurationHours(wake, sleep);
+        sleepHours.push({ date: dateStrs[i], hours: h });
+    }
+    const valid = sleepHours.filter(d => d.hours != null);
+    const avg = valid.length ? (valid.reduce((s,d)=>s+d.hours,0)/valid.length) : null;
+    const yesterday = sleepHours[sleepHours.length-1];
+    const yesterdayLabel = yesterday && yesterday.hours != null ? `${yesterday.hours}h睡眠` : '未記録';
+
+    bodyEl.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 mb-5">
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">昨日</div>
+                <div class="text-xl font-extrabold text-slate-900">${yesterdayLabel}</div>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2週間平均</div>
+                <div class="text-xl font-extrabold text-slate-900">${avg != null ? avg.toFixed(1)+'h' : '記録なし'}</div>
+            </div>
+        </div>
+        <canvas id="insightCanvas" height="180" class="w-full"></canvas>
+        <p class="text-[10px] font-bold text-slate-300 mt-3 text-center">起床・就寝時間の記録から自動計算した睡眠時間（過去14日）</p>
+    `;
+
+    const labels = sleepHours.map(d => { const [,m,day] = d.date.split('-'); return `${parseInt(m)}/${parseInt(day)}`; });
+    const data   = sleepHours.map(d => d.hours);
+
+    const draw = () => {
+        const ctx = document.getElementById('insightCanvas').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+        const tickColor = isDark ? '#64748b' : '#94a3b8';
+        const gridColor = isDark ? '#1e293b' : '#f1f5f9';
+        insightChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ data, backgroundColor: '#60a5fa', borderRadius: 4 }] },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false }, tooltip: {
+                    callbacks: { label: ctx => ctx.parsed.y != null ? ` ${ctx.parsed.y}時間` : '未記録' }
+                }},
+                scales: {
+                    x: { ticks: { font:{size:9,weight:'700'}, color: tickColor, maxRotation:0 }, grid:{display:false} },
+                    y: {
+                        beginAtZero: true,
+                        afterBuildTicks: (axis) => {
+                            const maxVal = axis.max;
+                            const step = maxVal <= 6 ? 1 : (maxVal <= 12 ? 2 : 3);
+                            const niceMax = Math.ceil(maxVal / step) * step;
+                            axis.max = niceMax;
+                            const ticks = [];
+                            for (let v = 0; v <= niceMax; v += step) ticks.push({ value: v });
+                            axis.ticks = ticks;
+                        },
+                        ticks: { font:{size:9,weight:'700'}, color: tickColor, callback: v=>v+'h' },
+                        grid:{color:gridColor}
+                    }
+                }
+            }
+        });
+    };
+    if (window.Chart) draw();
+    else { const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'; s.onload=draw; document.head.appendChild(s); }
+}
+
+async function renderScreenInsight(bodyEl) {
+    const { dateStrs, results } = await fetchDayRange(14);
+    const screenData = dateStrs.map(ds => results[ds]?.screenTime != null ? results[ds].screenTime : null);
+    const valid = screenData.filter(v => v != null);
+    const avg = valid.length ? Math.round(valid.reduce((s,v)=>s+v,0)/valid.length) : null;
+    const yesterday = screenData[screenData.length-1];
+
+    bodyEl.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 mb-5">
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">昨日</div>
+                <div class="text-xl font-extrabold text-slate-900">${yesterday != null ? fmtScreenTime(yesterday) : '未記録'}</div>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">2週間平均</div>
+                <div class="text-xl font-extrabold text-slate-900">${avg != null ? fmtScreenTime(avg) : '記録なし'}</div>
+            </div>
+        </div>
+        <canvas id="insightCanvas" height="180" class="w-full"></canvas>
+        <p class="text-[10px] font-bold text-slate-300 mt-3 text-center">スクリーンタイムの推移（過去14日）</p>
+    `;
+
+    const labels = dateStrs.map(ds => { const [,m,day] = ds.split('-'); return `${parseInt(m)}/${parseInt(day)}`; });
+
+    const draw = () => {
+        const ctx = document.getElementById('insightCanvas').getContext('2d');
+        const isDark = document.documentElement.classList.contains('dark');
+        const tickColor = isDark ? '#64748b' : '#94a3b8';
+        const gridColor = isDark ? '#1e293b' : '#f1f5f9';
+        insightChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [{
+                data: screenData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)',
+                pointBackgroundColor: '#f59e0b', pointRadius: 4, tension: 0.3, spanGaps: true, fill: true, borderWidth: 2.5
+            }] },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false }, tooltip: {
+                    callbacks: { label: ctx => ctx.parsed.y != null ? ` ${fmtScreenTime(ctx.parsed.y)}` : '未記録' }
+                }},
+                scales: {
+                    x: { ticks: { font:{size:9,weight:'700'}, color: tickColor, maxRotation:0 }, grid:{display:false} },
+                    y: {
+                        beginAtZero: true,
+                        afterBuildTicks: (axis) => {
+                            const maxVal = axis.max;
+                            let step;
+                            if (maxVal <= 60) step = 15;
+                            else if (maxVal <= 180) step = 30;
+                            else if (maxVal <= 360) step = 60;
+                            else if (maxVal <= 720) step = 120;
+                            else step = 180;
+                            const niceMax = Math.ceil(maxVal / step) * step;
+                            axis.max = niceMax;
+                            const ticks = [];
+                            for (let v = 0; v <= niceMax; v += step) ticks.push({ value: v });
+                            axis.ticks = ticks;
+                        },
+                        ticks: {
+                            font:{size:9,weight:'700'}, color: tickColor,
+                            callback: v => {
+                                if (v === 0) return '0m';
+                                if (v % 60 === 0) return (v/60) + 'h';
+                                return v + 'm';
+                            }
+                        },
+                        grid:{color:gridColor}
+                    }
+                }
+            }
+        });
+    };
+    if (window.Chart) draw();
+    else { const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'; s.onload=draw; document.head.appendChild(s); }
+}
+
+async function renderWeeklyInsight(bodyEl) {
+    // 過去7日の勉強時間合計
+    const { dateStrs, results } = await fetchDayRange(7);
+    let studyTotalSec = 0;
+    const studyPromises = dateStrs.map(ds => {
+        if (ds === todayStr()) {
+            studyTotalSec += tasks.reduce((s,t)=>s+t.elapsedSeconds,0);
+            return Promise.resolve();
+        }
+        return getDocs(collection(db,'users',currentUser.uid,'days',ds,'tasks'))
+            .then(snap => { snap.docs.forEach(d => studyTotalSec += (d.data().elapsedSeconds||0)); })
+            .catch(()=>{});
+    });
+    await Promise.all(studyPromises);
+
+    // 睡眠平均
+    const sleepHours = [];
+    for (let i = 1; i < dateStrs.length; i++) {
+        const wake  = results[dateStrs[i]]?.wakeTime;
+        const sleep = results[dateStrs[i-1]]?.sleepTime;
+        const h = sleepDurationHours(wake, sleep);
+        if (h != null) sleepHours.push(h);
+    }
+    const sleepAvg = sleepHours.length ? (sleepHours.reduce((s,h)=>s+h,0)/sleepHours.length) : null;
+
+    // ストリーク計算（連続でタスクがある日数）
+    let streak = 0;
+    const checkDate = new Date();
+    while (true) {
+        const ds = fmtDate(checkDate);
+        let hasTask = false;
+        if (ds === todayStr()) {
+            hasTask = tasks.length > 0;
+        } else {
+            try {
+                const snap = await getDocs(collection(db,'users',currentUser.uid,'days',ds,'tasks'));
+                hasTask = !snap.empty;
+            } catch(e) { hasTask = false; }
+        }
+        if (!hasTask) break;
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+        if (streak > 365) break; // safety
+    }
+
+    bodyEl.innerHTML = `
+        <div class="space-y-3">
+            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">過去7日間の勉強時間</div>
+                <div class="text-2xl font-extrabold text-slate-900">${fmtHM(studyTotalSec)}</div>
+                <div class="text-[10px] font-bold text-slate-400 mt-1">1日平均 ${fmtHM(studyTotalSec/7)}</div>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">睡眠平均（過去7日）</div>
+                <div class="text-2xl font-extrabold text-slate-900">${sleepAvg != null ? sleepAvg.toFixed(1)+'h' : '記録なし'}</div>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                <div class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">連続学習日数</div>
+                <div class="text-2xl font-extrabold text-slate-900">${streak > 0 ? streak+'日連続' : '記録なし'}</div>
+            </div>
+        </div>
+    `;
+}
+
+_registerImpl('openNotices', () => {
+    document.getElementById('noticesModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+});
+_registerImpl('closeNotices', () => {
+    document.getElementById('noticesModal').classList.add('hidden');
+    document.body.style.overflow = '';
+});
+
+function showToast(msg) {
+    const old = document.getElementById('_toast'); if(old) old.remove();
+    const t = document.createElement('div');
+    t.id='_toast';
+    t.className='fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-xl z-[100] text-xs font-bold toast-animate whitespace-nowrap';
+    t.innerText=msg; document.body.appendChild(t);
+    setTimeout(()=>t.remove(),3000);
+}
+_registerImpl('showToast', showToast);
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#bottom-nav .bnav-item').forEach(item => {
+        item.setAttribute('role', 'button');
+        item.addEventListener('click', () => {
+            const pageId = item.getAttribute('data-tab');
+            if (pageId && typeof window.switchPage === 'function') {
+                window.switchPage(pageId);
+            }
+        });
+    });
+});
+
+// Service Worker 無効化済み
+</script>
+</body>
+</html>
